@@ -9,7 +9,7 @@ env:
 permissions:
   contents: write
   pull-requests: write
-
+  metadata: write
 jobs:
   release-please:
     name: release-please
