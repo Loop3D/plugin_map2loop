@@ -1,0 +1,44 @@
+
+on:
+    push:
+      branches:
+        - main
+  env:
+      PACKAGE_NAME: plugin_map2loop
+  permissions:
+    contents: write
+    pull-requests: write
+  
+  name: release-please
+  jobs:
+    release-please:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: GoogleCloudPlatform/release-please-action@v4
+          id: release
+        - name: debug
+          run: echo "release_created=${{ steps.release.outputs.map2loop--tag_name }}"
+
+      outputs:
+        release_created: ${{ steps.release.outputs.releases_created }}
+    package:
+      needs: release-please
+      if: ${{ needs.release-please.outputs.release_created }}
+      runs-on: ubuntu-latest
+      steps:
+        - name: Extract tag name
+          id: tag
+          run: |
+            full_tag="${{ needs.release-please.outputs.tag_name }}"
+            tag="${full_tag#*--}"  # removes everything before the --
+            echo "tag=$tag" >> $GITHUB_OUTPUT
+  
+        - name: Trigger release.yml
+          run: |
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GH_PAT }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/Loop3d/${{ env.PACKAGE_NAME }}/actions/workflows/release.yml/dispatches \
+              -d "{\"ref\":\"${{ steps.tag.outputs.tag }}\"}"
+          
+  
