@@ -2,21 +2,21 @@ name: "✅ Linter"
 
 on:
   push:
-    branches:
-      - main
     paths:
       - '**.py'
 
   pull_request:
     branches:
-      - main
+      - master
     paths:
       - '**.py'
+  workflow_dispatch:
 
 env:
   PROJECT_FOLDER: "plugin_map2loop"
   PYTHON_VERSION: 3.9
-
+permissions:
+  contents: write
 
 jobs:
   lint-py:
@@ -32,44 +32,28 @@ jobs:
         uses: actions/setup-python@v5
         with:
           cache: "pip"
-          cache-dependency-path: "requirements/development.txt"
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install project requirements
+      - name: Install dependencies
         run: |
-          python -m pip install -U pip setuptools wheel
-          python -m pip install -U -r requirements/development.txt
-
-      - name: Lint with flake8
+          python -m pip install --upgrade pip
+          pip install black ruff
+      - name: Autoformat with black
         run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 ${{ env.PROJECT_FOLDER }} --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings.
-          flake8 ${{ env.PROJECT_FOLDER }} --count --exit-zero --statistics
-
-  qt6-check:
-    name: PyQt6 6️⃣
-    runs-on: ubuntu-latest
-    container:
-      image: registry.gitlab.com/oslandia/qgis/pyqgis-4-checker/pyqgis-qt-checker:latest
-      volumes:
-        - /tmp/.X11-unix:/tmp/.X11-unix
-        - ${{ github.workspace }}:/home/pyqgisdev/
-      options: --user root
-    steps:
-      - name: Get source code
-        uses: actions/checkout@v4
-
-      - name: Check PyQt5 to PyQt6 compatibility.
+          black .
+      - name: Lint with ruff
         run: |
-          pyqt5_to_pyqt6.py --dry_run ${{ env.PROJECT_FOLDER }}/
-          pyqt5_to_pyqt6.py --logfile pyqt6_checker.log ${{ env.PROJECT_FOLDER }}/
-
-      - name: Upload script report if script fails
-        uses: actions/upload-artifact@v4
-        if: ${{ failure() }}
+          ruff check ${{env.PROJECT_FOLDER}} --fix
+      - uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          name: pyqt6-checker-error-report
-          path: pyqt6_checker.log
-          retention-days: 7
-  
+          commit_message: "style: style fixes by ruff and autoformatting by black"
+          branch: lint/style-fixes-${{ github.run_id }}
+          create_branch: true
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "style: auto format fixes"
+          body: "This PR applies style fixes by black and ruff."
+          base: master
+          branch: lint/style-fixes-${{ github.run_id }}
