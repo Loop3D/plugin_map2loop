@@ -11,13 +11,10 @@
 
 from typing import Any, Optional
 
-from qgis import processing
 from qgis.core import (
-    QgsFeatureSink,
     QgsProcessing,
     QgsProcessingAlgorithm,
     QgsProcessingContext,
-    QgsProcessingException,
     QgsProcessingFeedback,
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterFeatureSource,
