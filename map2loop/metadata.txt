@@ -1,0 +1,26 @@
+[general]
+name=map2loop
+about=Loop tools for augmenting geological map data into 3D model datasets
+category=None
+hasProcessingProvider=True
+description=Extends QGIS with revolutionary features that every single GIS end-users was expected (or not)!
+icon=resources/images/default_icon.png
+tags=geology, modelling, structural geology, loop3d
+
+# credits and contact
+author=Lachlan GROSE
+email=lachlan.grose@monash.edu
+homepage=https://github.com/Loop3d/plugin_map2loop
+repository=https://github.com/Loop3d/plugin_map2loop
+tracker=https://github.com/Loop3d/plugin_map2loop/issues/
+
+# experimental flag
+deprecated=False
+experimental=True
+qgisMinimumVersion=3.4
+qgisMaximumVersion=3.99
+supportsQt6=True
+
+# versioning
+version=0.1.0
+changelog=

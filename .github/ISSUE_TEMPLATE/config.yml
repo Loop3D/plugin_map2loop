@@ -1,0 +1,6 @@
+blank_issues_enabled: true
+
+contact_links:
+  - name: Documentation
+    url: https://github.com/Loop3d/plugin_map2loop
+    about: Please read carefully the documentation before to submit an issue.
