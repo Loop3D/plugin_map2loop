@@ -1,4 +1,4 @@
-#! python3  # noqa E265
+#! python3
 
 """
 Usage from the repo root folder:
@@ -13,10 +13,10 @@ Usage from the repo root folder:
 
 # PyQGIS
 from qgis.core import QgsApplication
-from qgis.testing import unittest, start_app
+from qgis.testing import start_app, unittest
 
 from map2loop.processing.provider import (
-    Map2LoopPluginProvider,
+    Map2LoopProvider,
 )
 
 provider = None
@@ -28,10 +28,10 @@ class TestProcessing(unittest.TestCase):
     def setUp(self) -> None:
         """Set up the processing tests."""
         if not QgsApplication.processingRegistry().providers():
-            self.provider = Map2LoopPluginProvider()
+            self.provider = Map2LoopProvider()
             QgsApplication.processingRegistry().addProvider(self.provider)
         self.maxDiff = None
-                
+
         # Start App needed to run processing on unittest
         start_app()
 

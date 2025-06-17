@@ -1,4 +1,4 @@
-#! python3  # noqa: E265
+#! python3
 
 """
 Processing provider module.
@@ -21,7 +21,7 @@ from map2loop.__about__ import (
 # ##################################
 
 
-class Map2LoopPluginProvider(QgsProcessingProvider):
+class Map2LoopProvider(QgsProcessingProvider):
     """Processing provider class."""
 
     def loadAlgorithms(self):

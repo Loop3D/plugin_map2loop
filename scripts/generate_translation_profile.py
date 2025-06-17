@@ -60,10 +60,10 @@ def get_relative_paths(filepaths_list: list[Path]) -> list[str]:
 
 # Get the list of all files in directory tree at given path
 python_files = [
-    f for f in sorted(list(Path(src_path).rglob("*.py"))) if not f.name.startswith("__")
+    f for f in sorted(Path(src_path).rglob("*.py")) if not f.name.startswith("__")
 ]
-ui_files = [f for f in sorted(list(Path(src_path).rglob("*.ui")))]
-ts_files = [f for f in sorted(list(Path(src_path).rglob("*.ts")))]
+ui_files = sorted(Path(src_path).rglob("*.ui"))
+ts_files = sorted(Path(src_path).rglob("*.ts"))
 
 
 # Generate the translation profile

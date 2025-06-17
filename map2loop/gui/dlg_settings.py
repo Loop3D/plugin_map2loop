@@ -1,4 +1,4 @@
-#! python3  # noqa: E265
+#! python3
 
 """
 Plugin settings form integrated into QGIS 'Options' menu.

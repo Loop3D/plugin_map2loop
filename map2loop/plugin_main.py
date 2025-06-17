@@ -1,4 +1,4 @@
-#! python3  # noqa: E265
+#! python3
 
 """Main plugin module."""
 
@@ -22,10 +22,8 @@ from map2loop.__about__ import (
     __uri_homepage__,
 )
 from map2loop.gui.dlg_settings import PlgOptionsFactory
-
-
 from map2loop.processing import (
-    Map2LoopPluginProvider,
+    Map2LoopProvider,
 )
 from map2loop.toolbelt import PlgLogger
 
@@ -34,7 +32,7 @@ from map2loop.toolbelt import PlgLogger
 # ##################################
 
 
-class Map2LoopPluginPlugin:
+class Map2LoopPlugin:
     def __init__(self, iface: QgisInterface):
         """Constructor.
 
@@ -44,7 +42,7 @@ class Map2LoopPluginPlugin:
         """
         self.iface = iface
         self.log = PlgLogger().log
-        self.provider: Optional[Map2LoopPluginProvider] = None
+        self.provider: Optional[Map2LoopProvider] = None
 
         # translation
         # initialize the locale
@@ -52,9 +50,9 @@ class Map2LoopPluginPlugin:
             0:2
         ]
         locale_path: Path = (
-            DIR_PLUGIN_ROOT 
-            / "resources" 
-            / "i18n" 
+            DIR_PLUGIN_ROOT
+            / "resources"
+            / "i18n"
             / f"{__title__.lower()}_{self.locale}.qm"
         )
         self.log(message=f"Translation: {self.locale}, {locale_path}", log_level=4)
@@ -96,7 +94,6 @@ class Map2LoopPluginPlugin:
         self.iface.addPluginToMenu(__title__, self.action_help)
         # -- Processing
         self.initProcessing()
-        
 
         # -- Help menu
 
@@ -114,11 +111,11 @@ class Map2LoopPluginPlugin:
         self.iface.pluginHelpMenu().addAction(
             self.action_help_plugin_menu_documentation
         )
+
     def initProcessing(self):
-        """Initialize the processing provider."""    
-        self.provider = Map2LoopPluginProvider()
+        """Initialize the processing provider."""
+        self.provider = Map2LoopProvider()
         QgsApplication.processingRegistry().addProvider(self.provider)
-    
 
     def tr(self, message: str) -> str:
         """Get the translation for a string using Qt translation API.
@@ -141,7 +138,6 @@ class Map2LoopPluginPlugin:
         self.iface.unregisterOptionsWidgetFactory(self.options_factory)
         # -- Unregister processing
         QgsApplication.processingRegistry().removeProvider(self.provider)
-        
 
         # remove from QGIS help/extensions menu
         if self.action_help_plugin_menu_documentation:

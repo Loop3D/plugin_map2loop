@@ -1,4 +1,4 @@
-#! python3  # noqa: E265
+#! python3
 
 # ----------------------------------------------------------
 # Copyright (C) 2015 Martin Dobias
@@ -18,6 +18,6 @@ def classFactory(iface):
     :param iface: A QGIS interface instance.
     :type iface: QgsInterface
     """
-    from .plugin_main import Map2LoopPluginPlugin
+    from .plugin_main import Map2LoopPlugin
 
-    return Map2LoopPluginPlugin(iface)
+    return Map2LoopPlugin(iface)
