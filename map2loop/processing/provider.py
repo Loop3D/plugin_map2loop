@@ -16,6 +16,8 @@ from map2loop.__about__ import (
     __version__,
 )
 
+from .algorithms import BasalContactsAlgorithm
+
 # ############################################################################
 # ########## Classes ###############
 # ##################################
@@ -26,6 +28,7 @@ class Map2LoopProvider(QgsProcessingProvider):
 
     def loadAlgorithms(self):
         """Loads all algorithms belonging to this provider."""
+        self.addAlgorithm(BasalContactsAlgorithm())
         pass
 
     def id(self) -> str:
