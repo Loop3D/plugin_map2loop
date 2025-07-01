@@ -44,7 +44,7 @@ jobs:
       - name: Lint with ruff
         run: |
           ruff check ${{env.PROJECT_FOLDER}} --fix
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: stefanzweifel/git-auto-commit-action@v6
         with:
           commit_message: "style: style fixes by ruff and autoformatting by black"
           branch: lint/style-fixes-${{ github.run_id }}
