@@ -3,7 +3,10 @@ from typing import Any, Optional
 from qgis import processing
 from qgis.core import (
     QgsFeatureSink,
-    QgsFields, QgsField, QgsFeature, QgsGeometry,
+    QgsFields, 
+    QgsField, 
+    QgsFeature, 
+    QgsGeometry,
     QgsProcessing,
     QgsProcessingAlgorithm,
     QgsProcessingContext,
@@ -13,6 +16,7 @@ from qgis.core import (
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterFeatureSource,
     QgsVectorLayer,
+    QgsWkbTypes
 )
 
 # ────────────────────────────────────────────────
