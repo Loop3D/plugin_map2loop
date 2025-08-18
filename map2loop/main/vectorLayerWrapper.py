@@ -91,91 +91,170 @@ def qgsLayerToDataFrame(layer, dtm) -> pd.DataFrame:
                 data[field.name()].append(feature[field.name()])
     return pd.DataFrame(data)
 
-def GeoDataFrameToQgsLayer(gdf, layer_name="from_gdf"):
+def GeoDataFrameToQgsLayer(qgs_algorithm, geodataframe, parameters, context, output_key, feedback=None):
     """
-    Convert a GeoPandas GeoDataFrame to a QGIS memory layer (QgsVectorLayer).
-    Keeps attributes and CRS. Works for Point/LineString/Polygon and their Multi*.
+    Write a GeoPandas GeoDataFrame directly to a QGIS Processing FeatureSink.
+
+    Parameters
+    ----------
+    alg : QgsProcessingAlgorithm (self)
+    gdf : geopandas.GeoDataFrame
+    parameters : dict (from processAlgorithm)
+    context : QgsProcessingContext
+    output_key : str  (e.g. self.OUTPUT)
+    feedback : QgsProcessingFeedback | None
+
+    Returns
+    -------
+    str : dest_id to return from processAlgorithm, e.g. { output_key: dest_id }
     """
-
-    if gdf is None or gdf.empty:
-        raise ValueError("GeoDataFrame is empty")
-
-    # --- infer geometry type from first non-empty geometry
-    def infer_wkb(geoms):
-        for g in geoms:
-            if g is None:
-                continue
-            if hasattr(g, "is_empty") and g.is_empty:
-                continue
-            if isinstance(g, MultiPoint):       return QgsWkbTypes.MultiPoint
-            if isinstance(g, Point):            return QgsWkbTypes.Point
-            if isinstance(g, MultiLineString):  return QgsWkbTypes.MultiLineString
-            if isinstance(g, LineString):       return QgsWkbTypes.LineString
-            if isinstance(g, MultiPolygon):     return QgsWkbTypes.MultiPolygon
-            if isinstance(g, Polygon):          return QgsWkbTypes.Polygon
-        raise ValueError("Could not infer geometry type (all geometries empty?)")
-
-    wkb_type = infer_wkb(gdf.geometry)
-
-    # --- build CRS
-    crs_qgis = QgsCoordinateReferenceSystem()
-    if gdf.crs is not None:
-        try:
-            crs_qgis = QgsCoordinateReferenceSystem.fromWkt(gdf.crs.to_wkt())
-        except Exception:
-            epsg = gdf.crs.to_epsg()
-            if epsg:
-                crs_qgis = QgsCoordinateReferenceSystem.fromEpsgId(int(epsg))
-
-    geom_str = QgsWkbTypes.displayString(wkb_type)  # e.g. "LineString"
-    uri = f"{geom_str}?crs={crs_qgis.authid()}" if crs_qgis.isValid() else geom_str
-    layer = QgsVectorLayer(uri, layer_name, "memory")
-    prov = layer.dataProvider()
-
-    # --- fields: map pandas dtypes → QGIS
+    import pandas as pd
     import numpy as np
+    from shapely.geometry import (
+        Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
+    )
+
+    from qgis.core import (
+        QgsFields, QgsField, QgsFeature, QgsGeometry,
+        QgsWkbTypes, QgsCoordinateReferenceSystem, QgsFeatureSink
+    )
+    from qgis.PyQt.QtCore import QVariant, QDateTime
+
+    if feedback is None:
+        class _Dummy:
+            def pushInfo(self, *a, **k): pass
+            def reportError(self, *a, **k): pass
+            def setProgress(self, *a, **k): pass
+            def isCanceled(self): return False
+        feedback = _Dummy()
+
+    if geodataframe is None:
+        raise ValueError("GeoDataFrame is None")
+    if geodataframe.empty:
+        feedback.pushInfo("Input GeoDataFrame is empty; creating empty output layer.")
+
+    # --- infer WKB type (family, Multi, Z)
+    def _infer_wkb(series):
+        base = None
+        any_multi = False
+        has_z = False
+        for geom in series:
+            if geom is None: continue
+            if getattr(geom, "is_empty", False): continue
+            # multi?
+            if isinstance(geom, (MultiPoint, MultiLineString, MultiPolygon)):
+                any_multi = True
+                g0 = next(iter(getattr(geom, "geoms", [])), None)
+                gt = getattr(g0, "geom_type", None) or None
+            else:
+                gt = getattr(geom, "geom_type", None)
+
+            # base family
+            if gt in ("Point", "LineString", "Polygon"):
+                base = gt
+                # z?
+                try:
+                    has_z = has_z or bool(getattr(geom, "has_z", False))
+                except Exception:
+                    pass
+                if base:
+                    break
+
+        if base is None:
+            # default safely to LineString if everything is empty; adjust if you prefer Point/Polygon
+            base = "LineString"
+
+        fam = {
+            "Point": QgsWkbTypes.Point,
+            "LineString": QgsWkbTypes.LineString,
+            "Polygon": QgsWkbTypes.Polygon,
+        }[base]
+
+        if any_multi:
+            fam = QgsWkbTypes.multiType(fam)
+        if has_z:
+            fam = QgsWkbTypes.addZ(fam)
+        return fam
+
+    wkb_type = _infer_wkb(geodataframe.geometry)
+
+    # --- build CRS from gdf.crs
+    crs = QgsCoordinateReferenceSystem()
+    if geodataframe.crs is not None:
+        try:
+            crs = QgsCoordinateReferenceSystem.fromWkt(geodataframe.crs.to_wkt())
+        except Exception:
+            try:
+                epsg = geodataframe.crs.to_epsg()
+                if epsg:
+                    crs = QgsCoordinateReferenceSystem.fromEpsgId(int(epsg))
+            except Exception:
+                pass
+
+    # --- build QGIS fields from pandas dtypes
     fields = QgsFields()
-    for col in gdf.columns:
-        if col == gdf.geometry.name:
-            continue
-        dtype = gdf[col].dtype
+    non_geom_cols = [c for c in geodataframe.columns if c != geodataframe.geometry.name]
+
+    def _qvariant_type(dtype) -> QVariant.Type:
         if pd.api.types.is_integer_dtype(dtype):
-            qtype = QVariant.Int
-        elif pd.api.types.is_float_dtype(dtype):
-            qtype = QVariant.Double
-        elif pd.api.types.is_bool_dtype(dtype):
-            qtype = QVariant.Bool
-        elif pd.api.types.is_datetime64_any_dtype(dtype):
-            qtype = QVariant.DateTime
-        else:
-            qtype = QVariant.String
-        fields.append(QgsField(str(col), qtype))
-    prov.addAttributes(list(fields))
-    layer.updateFields()
+            return QVariant.Int
+        if pd.api.types.is_float_dtype(dtype):
+            return QVariant.Double
+        if pd.api.types.is_bool_dtype(dtype):
+            return QVariant.Bool
+        if pd.api.types.is_datetime64_any_dtype(dtype):
+            return QVariant.DateTime
+        return QVariant.String
 
-    # --- features
-    feats = []
-    non_geom_cols = [c for c in gdf.columns if c != gdf.geometry.name]
+    for col in non_geom_cols:
+        fields.append(QgsField(str(col), _qvariant_type(geodataframe[col].dtype)))
 
-    for _, row in gdf.iterrows():
-        geom = row[gdf.geometry.name]
-        if geom is None or (hasattr(geom, "is_empty") and geom.is_empty):
+    # --- create sink
+    sink, dest_id = qgs_algorithm.parameterAsSink(
+        parameters,
+        output_key,
+        context,
+        fields,
+        wkb_type,
+        crs,
+    )
+    if sink is None:
+        from qgis.core import QgsProcessingException
+        raise QgsProcessingException("Could not create output sink")
+
+    # --- write features
+    total = len(geodataframe.index)
+    is_multi_sink = QgsWkbTypes.isMultiType(wkb_type)
+
+    for i, (_, row) in enumerate(geodataframe.iterrows()):
+        if feedback.isCanceled():
+            break
+
+        geom = row[geodataframe.geometry.name]
+        if geom is None or getattr(geom, "is_empty", False):
             continue
+
+        # promote single → multi if needed
+        if is_multi_sink:
+            if isinstance(geom, Point):
+                geom = MultiPoint([geom])
+            elif isinstance(geom, LineString):
+                geom = MultiLineString([geom])
+            elif isinstance(geom, Polygon):
+                geom = MultiPolygon([geom])
 
         f = QgsFeature(fields)
 
-        # attributes in declared order with type cleanup
+        # attributes in declared order
         attrs = []
         for col in non_geom_cols:
             val = row[col]
-            # numpy scalar → python scalar
-            if isinstance(val, (np.generic,)):
+            if isinstance(val, np.generic):
                 try:
                     val = val.item()
                 except Exception:
                     pass
-            # pandas Timestamp → QDateTime (if column is datetime)
-            if pd.api.types.is_datetime64_any_dtype(gdf[col].dtype):
+            if pd.api.types.is_datetime64_any_dtype(geodataframe[col].dtype):
                 if pd.isna(val):
                     val = None
                 else:
@@ -189,10 +268,10 @@ def GeoDataFrameToQgsLayer(gdf, layer_name="from_gdf"):
         except Exception:
             f.setGeometry(QgsGeometry.fromWkt(geom.wkt))
 
-        feats.append(f)
+        sink.addFeature(f, QgsFeatureSink.FastInsert)
 
-    if feats:
-        prov.addFeatures(feats)
-        layer.updateExtents()
+        if total:
+            feedback.setProgress(int(100.0 * (i + 1) / total))
 
-    return layer  # optionally: QgsProject.instance().addMapLayer(layer)
+    return dest_id
+
