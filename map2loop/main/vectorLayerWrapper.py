@@ -1,19 +1,19 @@
 from qgis.core import (
-        QgsVectorLayer, 
+        QgsRaster,
         QgsFields, 
-        QgsField,
-        QgsFeature,
+        QgsField, 
+        QgsFeature, 
         QgsGeometry,
         QgsWkbTypes, 
         QgsCoordinateReferenceSystem, 
-        QgsProject, 
-        QgsRaster
+        QgsFeatureSink
     )
 from qgis.PyQt.QtCore import QVariant, QDateTime
 
 from shapely.geometry import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
 import pandas as pd
 import geopandas as gpd
+import numpy as np
    
 
 
@@ -108,17 +108,6 @@ def GeoDataFrameToQgsLayer(qgs_algorithm, geodataframe, parameters, context, out
     -------
     str : dest_id to return from processAlgorithm, e.g. { output_key: dest_id }
     """
-    import pandas as pd
-    import numpy as np
-    from shapely.geometry import (
-        Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
-    )
-
-    from qgis.core import (
-        QgsFields, QgsField, QgsFeature, QgsGeometry,
-        QgsWkbTypes, QgsCoordinateReferenceSystem, QgsFeatureSink
-    )
-    from qgis.PyQt.QtCore import QVariant, QDateTime
 
     if feedback is None:
         class _Dummy:
