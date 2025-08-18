@@ -91,7 +91,7 @@ def qgsLayerToDataFrame(layer, dtm) -> pd.DataFrame:
                 data[field.name()].append(feature[field.name()])
     return pd.DataFrame(data)
 
-def gdf_to_qgis_layer(gdf, layer_name="from_gdf"):
+def GeoDataFrameToQgsLayer(gdf, layer_name="from_gdf"):
     """
     Convert a GeoPandas GeoDataFrame to a QGIS memory layer (QgsVectorLayer).
     Keeps attributes and CRS. Works for Point/LineString/Polygon and their Multi*.
