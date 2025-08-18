@@ -8,9 +8,10 @@
 *                                                                         *
 ***************************************************************************
 """
-
+# Python imports
 from typing import Any, Optional
 
+# QGIS imports
 from qgis import processing
 from qgis.core import (
     QgsFeatureSink,
@@ -22,17 +23,23 @@ from qgis.core import (
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterFeatureSource,
 )
+# Internal imports
+from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer 
+from map2loop import ContactExtractor
 
 
 class BasalContactsAlgorithm(QgsProcessingAlgorithm):
     """Processing algorithm to create basal contacts."""
-
-    INPUT = "INPUT"
-    OUTPUT = "OUTPUT"
+    
+    
+    INPUT_GEOLOGY = 'GEOLOGY'
+    INPUT_FAULTS = 'FAULTS'
+    INPUT_STRATI_COLUMN = 'STRATIGRAPHIC_COLUMN'
+    OUTPUT = "BASAL_CONTACTS"
 
     def name(self) -> str:
         """Return the algorithm name."""
-        return "loop: basal_contacts"
+        return "basal_contacts"
 
     def displayName(self) -> str:
         """Return the algorithm display name."""
@@ -48,20 +55,37 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
+        
         self.addParameter(
             QgsProcessingParameterFeatureSource(
-                self.INPUT,
-                "Geology Polygons",
+                self.INPUT_GEOLOGY,
+                "GEOLOGY",
                 [QgsProcessing.TypeVectorPolygon],
             )
         )
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_FAULTS,
+                "FAULTS",
+                [QgsProcessing.TypeVectorLine],
+                optional=True,
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_STRATI_COLUMN,
+                "STRATIGRAPHIC_COLUMN",
+                [QgsProcessing.TypeVectorLine],
+            )
+        )
+        
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
                 "Basal Contacts",
             )
         )
-        pass
 
     def processAlgorithm(
         self,
@@ -69,7 +93,26 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
         context: QgsProcessingContext,
         feedback: QgsProcessingFeedback,
     ) -> dict[str, Any]:
-        pass
+
+        geology = self.parameterAsSource(parameters, self.INPUT_GEOLOGY, context)
+        faults = self.parameterAsSource(parameters, self.INPUT_FAULTS, context)
+        strati_column = self.parameterAsSource(parameters, self.INPUT_STRATI_COLUMN, context)
+        
+        geology = qgsLayerToGeoDataFrame(geology)
+        faults = qgsLayerToGeoDataFrame(faults) if faults else None
+        
+        feedback.pushInfo("Extracting Basal Contacts...")
+        contact_extractor = ContactExtractor(geology, faults, feedback)
+        contact_extractor.extract_basal_contacts(strati_column)
+    
+        basal_contacts = GeoDataFrameToQgsLayer(
+            self, 
+            contact_extractor.basal_contacts,
+            parameters=parameters,
+            context=context,
+            feedback=feedback,
+            )
+        return {self.OUTPUT: basal_contacts}
 
     def createInstance(self) -> QgsProcessingAlgorithm:
         """Create a new instance of the algorithm."""
