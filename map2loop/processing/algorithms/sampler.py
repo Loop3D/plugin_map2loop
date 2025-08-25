@@ -142,8 +142,8 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         samples = sampler.sample(spatial_data)
     
         samples = qgs
-        return {self.OUTPUT: basal_contacts}
+        return {self.OUTPUT: samples}
 
     def createInstance(self) -> QgsProcessingAlgorithm:
         """Create a new instance of the algorithm."""
-        return self.__class__()  # BasalContactsAlgorithm()
+        return self.__class__()  # SamplerAlgorithm()
