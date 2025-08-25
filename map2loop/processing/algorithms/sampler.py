@@ -136,11 +136,12 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         geology = qgsLayerToGeoDataFrame(geology)
         spatial_data = qgsLayerToGeoDataFrame(spatial_data)
         
-        if sampler_type == "SamplerDecimator":
+        if sampler_type == "decimator":
             feedback.pushInfo("Sampling...")
             sampler = SamplerDecimator(decimation=decimation, dtm_data=dtm, geology_data=geology, feedback=feedback)
             samples = sampler.sample(spatial_data)
-        if sampler_type == "SamplerSpacing":
+            
+        if sampler_type == "spacing":
             feedback.pushInfo("Sampling...")
             sampler = SamplerSpacing(spacing=spacing, dtm_data=dtm, geology_data=geology, feedback=feedback)
             samples = sampler.sample(spatial_data)
