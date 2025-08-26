@@ -10,9 +10,9 @@
 """
 # Python imports
 from typing import Any, Optional
+from qgis.PyQt.QtCore import QMetaType
 
 # QGIS imports
-from qgis import processing
 from qgis.core import (
     QgsFeatureSink,
     QgsProcessing,
@@ -23,10 +23,15 @@ from qgis.core import (
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterFeatureSource,
     QgsProcessingParameterString,
-    QgsProcessingParameterNumber
+    QgsProcessingParameterNumber,
+    QgsField,
+    QgsFeature,
+    QgsGeometry,
+    QgsPointXY,
+    QgsVectorLayer
 )
 # Internal imports
-from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer 
+from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame
 from map2loop.map2loop.sampler import SamplerDecimator, SamplerSpacing
 
 
@@ -145,10 +150,41 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             feedback.pushInfo("Sampling...")
             sampler = SamplerSpacing(spacing=spacing, dtm_data=dtm, geology_data=geology, feedback=feedback)
             samples = sampler.sample(spatial_data)
+       
 
-        #TODO: convert sample to qgis layer
-        # samples = qgs
-        return {self.OUTPUT: samples}
+        # create layer
+        vector_layer = QgsVectorLayer("Point", "sampled_points", "memory")
+        provider = vector_layer.dataProvider()
+
+        # add fields
+        provider.addAttributes([QgsField("ID", QMetaType.Type.QString),
+                            QgsField("X",  QMetaType.Type.Float),
+                            QgsField("Y",  QMetaType.Type.Float),
+                            QgsField("Z",  QMetaType.Type.Float),
+                            QgsField("featureId", QMetaType.Type.QString)
+                            ])
+        vector_layer.updateFields() # tell the vector layer to fetch changes from the provider
+
+        # add a feature
+        for i in range(len(samples)):
+            feature = QgsFeature()
+            feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(samples.X[i], samples.Y[i], samples.Z[i])))
+            feature.setAttributes([samples.ID[i], samples.X[i], samples.Y[i], samples.Z[i], samples.featureId[i]])
+            provider.addFeatures([feature])
+
+        # update layer's extent when new features have been added
+        # because change of extent in provider is not propagated to the layer
+        vector_layer.updateExtents()
+        # --- create sink
+        sink, dest_id = self.parameterAsSink(
+            parameters,
+            self.OUTPUT,
+            context,
+            vector_layer.fields(),
+            QgsGeometry.Type.Point,
+            spatial_data.crs,
+            )
+        return {self.OUTPUT: dest_id}
 
     def createInstance(self) -> QgsProcessingAlgorithm:
         """Create a new instance of the algorithm."""
