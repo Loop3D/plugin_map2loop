@@ -315,7 +315,7 @@ def _fields_from_dataframe(df, drop_cols=None) -> QgsFields:
 
 # ---------- main function you'll call inside processAlgorithm ----------
 
-def dataframe_to_point_sink(
+def dataframeToQgsLayer(
     df,
     x_col: str,
     y_col: str,
