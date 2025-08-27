@@ -31,7 +31,7 @@ from map2loop.map2loop.thickness_calculator import InterpolatedStructure, Struct
 class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
     """Processing algorithm for thickness calculations."""
 
-    
+    INPUT_THICKNESS_CALCULATOR_TYPE = 'THICKNESS_CALCULATOR_TYPE'
     INPUT_DTM = 'DTM'
     INPUT_BOUNDING_BOX = 'BOUNDING_BOX'
     INPUT_MAX_LINE_LENGTH = 'MAX_LINE_LENGTH'
@@ -62,7 +62,33 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
+
         
+        
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_THICKNESS_CALCULATOR_TYPE,
+                "Thickness Calculator Type",
+                [QgsProcessing.TypeVectorPoint],
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_BASAL_CONTACTS,
+                "Basal Contacts",
+                [QgsProcessing.TypeVectorPoint],
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_DTM,
+                "DTM",
+                [QgsProcessing.TypeVectorRaster],
+            )
+        )
+
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT_GEOLOGY,
@@ -90,7 +116,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                "Basal Contacts",
+                "Thickness",
             )
         )
 
