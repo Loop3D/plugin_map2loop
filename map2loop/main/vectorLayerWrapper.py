@@ -1,3 +1,5 @@
+# PyQGIS / PyQt imports
+
 from qgis.core import (
         QgsRaster,
         QgsFields, 
@@ -6,8 +8,10 @@ from qgis.core import (
         QgsGeometry,
         QgsWkbTypes, 
         QgsCoordinateReferenceSystem, 
-        QgsFeatureSink
+        QgsFeatureSink,
+        QgsProcessingException
     )
+
 from qgis.PyQt.QtCore import QVariant, QDateTime
 
 from shapely.geometry import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
@@ -208,7 +212,6 @@ def GeoDataFrameToQgsLayer(qgs_algorithm, geodataframe, parameters, context, out
         crs,
     )
     if sink is None:
-        from qgis.core import QgsProcessingException
         raise QgsProcessingException("Could not create output sink")
 
     # --- write features
@@ -264,3 +267,185 @@ def GeoDataFrameToQgsLayer(qgs_algorithm, geodataframe, parameters, context, out
 
     return dest_id
 
+
+# ---------- helpers ----------
+
+def _qvariant_type_from_dtype(dtype) -> QVariant.Type:
+    """Map a pandas dtype to a QVariant type."""
+    import numpy as np
+    if np.issubdtype(dtype, np.integer):
+        # prefer 64-bit when detected
+        try:
+            return QVariant.LongLong
+        except AttributeError:
+            return QVariant.Int
+    if np.issubdtype(dtype, np.floating):
+        return QVariant.Double
+    if np.issubdtype(dtype, np.bool_):
+        return QVariant.Bool
+    # datetimes
+    try:
+        import pandas as pd
+        if pd.api.types.is_datetime64_any_dtype(dtype):
+            return QVariant.DateTime
+        if pd.api.types.is_datetime64_ns_dtype(dtype):
+            return QVariant.DateTime
+        if pd.api.types.is_datetime64_dtype(dtype):
+            return QVariant.DateTime
+        if pd.api.types.is_timedelta64_dtype(dtype):
+            # store as string "HH:MM:SS" fallback
+            return QVariant.String
+    except Exception:
+        pass
+    # default to string
+    return QVariant.String
+
+
+def _fields_from_dataframe(df, drop_cols=None) -> QgsFields:
+    """Build QgsFields from DataFrame dtypes."""
+    drop_cols = set(drop_cols or [])
+    fields = QgsFields()
+    for name, dtype in df.dtypes.items():
+        if name in drop_cols:
+            continue
+        vtype = _qvariant_type_from_dtype(dtype)
+        fields.append(QgsField(name, vtype))
+    return fields
+
+
+# ---------- main function you'll call inside processAlgorithm ----------
+
+def dataframe_to_point_sink(
+    df,
+    x_col: str,
+    y_col: str,
+    *,
+    crs: QgsCoordinateReferenceSystem,
+    algorithm,            # `self` inside a QgsProcessingAlgorithm
+    parameters: dict,
+    context,
+    feedback,
+    sink_param_name: str = "OUTPUT",
+    z_col: str = None,
+    m_col: str = None,
+    include_coords_in_attrs: bool = False,
+):
+    """
+    Write a pandas DataFrame to a point feature sink (QgsProcessingParameterFeatureSink).
+
+    Params
+    ------
+    df : pandas.DataFrame                  Data with coordinate columns.
+    x_col, y_col : str                     Column names for X/Easting/Longitude and Y/Northing/Latitude.
+    crs : QgsCoordinateReferenceSystem     CRS of the coordinates (e.g., QgsCoordinateReferenceSystem('EPSG:4326')).
+    algorithm : QgsProcessingAlgorithm     Use `self` from inside processAlgorithm.
+    parameters, context, feedback          Standard Processing plumbing.
+    sink_param_name : str                  Name of your sink output parameter (default "OUTPUT").
+    z_col, m_col : str | None              Optional Z and M columns for 3D/M points.
+    include_coords_in_attrs : bool         If False, x/y/z/m are not written as attributes.
+
+    Returns
+    -------
+    (sink, sink_id)                        The created sink and its ID. Also returns feature count via feedback.
+    """
+    import pandas as pd
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df must be a pandas.DataFrame")
+
+    # Make a working copy; optionally drop coordinate columns from attributes
+    attr_df = df.copy()
+    drop_cols = []
+    for col in [x_col, y_col, z_col, m_col]:
+        if col and not include_coords_in_attrs:
+            drop_cols.append(col)
+
+    fields = _fields_from_dataframe(attr_df, drop_cols=drop_cols)
+
+    # Geometry type (2D/3D/M)
+    has_z = z_col is not None and z_col in df.columns
+    has_m = m_col is not None and m_col in df.columns
+    if has_z and has_m:
+        wkb = QgsWkbTypes.PointZM
+    elif has_z:
+        wkb = QgsWkbTypes.PointZ
+    elif has_m:
+        wkb = QgsWkbTypes.PointM
+    else:
+        wkb = QgsWkbTypes.Point
+
+    # Create the sink
+    sink, sink_id = algorithm.parameterAsSink(
+        parameters,
+        sink_param_name,
+        context,
+        fields,
+        wkb,
+        crs
+    )
+    if sink is None:
+        raise QgsProcessingException("Could not create feature sink. Check output parameter and inputs.")
+
+    total = len(df)
+    feedback.pushInfo(f"Writing {total} features…")
+
+    # Precompute attribute column order
+    attr_columns = [f.name() for f in fields]
+
+    # Iterate rows and write features
+    for i, (idx, row) in enumerate(df.iterrows(), start=1):
+        if feedback.isCanceled():
+            break
+
+        # Build point geometry
+        x = row[x_col]
+        y = row[y_col]
+
+        # skip rows with missing coords
+        if pd.isna(x) or pd.isna(y):
+            continue
+
+        if has_z and not pd.isna(row[z_col]) and has_m and not pd.isna(row[m_col]):
+            pt = QgsPoint(float(x), float(y), float(row[z_col]), float(row[m_col]))
+        elif has_z and not pd.isna(row[z_col]):
+            pt = QgsPoint(float(x), float(y), float(row[z_col]))
+        elif has_m and not pd.isna(row[m_col]):
+            # PointM constructor: setZValue not needed; M is the 4th ordinate
+            pt = QgsPoint(float(x), float(y))
+            pt.setM(float(row[m_col]))
+        else:
+            pt = QgsPointXY(float(x), float(y))
+
+        feat = QgsFeature(fields)
+        feat.setGeometry(QgsGeometry.fromPoint(pt) if isinstance(pt, QgsPoint) else QgsGeometry.fromPointXY(pt))
+
+        # Attributes in the same order as fields
+        attrs = []
+        for col in attr_columns:
+            val = row[col] if col in row else None
+            # Pandas NaN -> None
+            if pd.isna(val):
+                val = None
+            # Convert numpy types to Python scalars to avoid QVariant issues
+            try:
+                import numpy as np
+                if isinstance(val, (np.generic,)):
+                    val = val.item()
+            except Exception:
+                pass
+            # Convert pandas Timestamp to Python datetime
+            if hasattr(val, "to_pydatetime"):
+                try:
+                    val = val.to_pydatetime()
+                except Exception:
+                    val = str(val)
+            attrs.append(val)
+        feat.setAttributes(attrs)
+
+        sink.addFeature(feat, QgsFeature.FastInsert)
+
+        if i % 1000 == 0:
+            feedback.setProgress(int(100.0 * i / max(total, 1)))
+
+    feedback.pushInfo("Done.")
+    feedback.setProgress(100)
+    return sink, sink_id
