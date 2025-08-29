@@ -12,8 +12,8 @@ from qgis.PyQt.QtWidgets import QPushButton, QWidget
 from qgis.utils import iface
 
 # project package
-import map2loop.toolbelt.preferences as plg_prefs_hdlr
-from map2loop.__about__ import __title__
+import m2l.toolbelt.preferences as plg_prefs_hdlr
+from m2l.__about__ import __title__
 
 # ############################################################################
 # ########## Classes ###############

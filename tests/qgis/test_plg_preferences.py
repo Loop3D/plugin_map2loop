@@ -18,8 +18,8 @@ from unittest.mock import patch
 from qgis.testing import unittest
 
 # project
-from map2loop.__about__ import __version__
-from map2loop.toolbelt.preferences import (
+from m2l.__about__ import __version__
+from m2l.toolbelt.preferences import (
     PREFIX_ENV_VARIABLE,
     PlgOptionsManager,
     PlgSettingsStructure,
