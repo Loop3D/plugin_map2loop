@@ -28,8 +28,6 @@ from qgis.core import (
 # Internal imports
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer
 from map2loop.contact_extractor import ContactExtractor
-from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer 
-from map2loop.contact_extractor import ContactExtractor
 
 
 class BasalContactsAlgorithm(QgsProcessingAlgorithm):
