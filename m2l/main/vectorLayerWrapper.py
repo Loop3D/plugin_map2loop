@@ -24,69 +24,28 @@ import numpy as np
    
 
 
-# def qgsLayerToGeoDataFrame(layer) -> gpd.GeoDataFrame:
-#     if layer is None:
-#         return None
-#     features = layer.getFeatures()
-#     fields = layer.fields()
-#     data = {'geometry': []}
-#     for f in fields:
-#         data[f.name()] = []
-#     for feature in features:
-#         geom = feature.geometry()
-#         if geom.isEmpty():
-#             continue
-#         data['geometry'].append(geom)
-#         for f in fields:
-#             data[f.name()].append(feature[f.name()])
-#     return gpd.GeoDataFrame(data, crs=layer.crs().authid())
-
 def qgsLayerToGeoDataFrame(layer) -> gpd.GeoDataFrame:
-    """
-    Convert a QgsVectorLayer to a GeoDataFrame with:
-      - Shapely geometries
-      - Pandas nullable string dtype for QGIS string fields
-    """
     if layer is None:
         return None
-
+    features = layer.getFeatures()
     fields = layer.fields()
-    string_field_names = {
-        f.name() for f in fields
-        if f.type() in (QVariant.String,)  # extend here if you use other text types
-    }
-
-    rows = []
-    for feat in layer.getFeatures():
-        geom = feat.geometry()
+    data = {'geometry': []}
+    for f in fields:
+        data[f.name()] = []
+    for feature in features:
+        geom = feature.geometry()
         if geom.isEmpty():
             continue
-
-        row = {"geometry": wkb_loads(geom.asWkb())}
+        data['geometry'].append(geom)
         for f in fields:
-            val = feat[f.name()]
-            # Normalize None in string cols to pandas.NA so StringDtype works cleanly
-            if f.name() in string_field_names:
-                row[f.name()] = pd.NA if val is None else str(val)
-            else:
-                row[f.name()] = val
-        rows.append(row)
+            data[f.name()].append(feature[f.name()])
+    gdf = gpd.GeoDataFrame(data, crs=layer.crs().authid())
 
-    if not rows:
-        # Empty GeoDataFrame with correct schema & crs
-        gdf = gpd.GeoDataFrame(columns=["geometry"] + [f.name() for f in fields],
-                               geometry="geometry",
-                               crs=layer.crs().authid())
-    else:
-        gdf = gpd.GeoDataFrame(rows, geometry="geometry", crs=layer.crs().authid())
-
-    # Enforce pandas' nullable string dtype on QGIS string fields
-    for name in string_field_names:
-        if name in gdf.columns:
-            gdf[name] = gdf[name].astype("string")
-
+    # ✅ Convert only QGIS string fields to pandas string dtype
+    for f in fields:
+        if f.type() == QVariant.String and f.name() in gdf.columns:
+            gdf[f.name()] = gdf[f.name()].astype(str)
     return gdf
-
 
 def qgsLayerToDataFrame(layer, dtm) -> pd.DataFrame:
     """Convert a vector layer to a pandas DataFrame
