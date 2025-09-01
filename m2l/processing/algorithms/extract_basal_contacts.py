@@ -22,8 +22,12 @@ from qgis.core import (
     QgsProcessingFeedback,
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterFeatureSource,
+    QgsProcessingParameterString,
+    QgsProcessingParameterField
 )
 # Internal imports
+from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer
+from map2loop.contact_extractor import ContactExtractor
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer 
 from map2loop.contact_extractor import ContactExtractor
 
@@ -64,6 +68,16 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
             )
         )
         self.addParameter(
+            QgsProcessingParameterField(
+                'UNIT_NAME_FIELD',
+                'Unit Name Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.String,
+                defaultValue='unitname'
+            )
+        )
+
+        self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT_FAULTS,
                 "FAULTS",
@@ -71,12 +85,13 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
                 optional=True,
             )
         )
-        
+
         self.addParameter(
-            QgsProcessingParameterFeatureSource(
+            QgsProcessingParameterString(
                 self.INPUT_STRATI_COLUMN,
-                "STRATIGRAPHIC_COLUMN",
-                [QgsProcessing.TypeVectorLine],
+                "Stratigraphic Column Names",
+                defaultValue="",
+                optional=True
             )
         )
         
@@ -94,22 +109,31 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
         feedback: QgsProcessingFeedback,
     ) -> dict[str, Any]:
 
-        geology = self.parameterAsSource(parameters, self.INPUT_GEOLOGY, context)
-        faults = self.parameterAsSource(parameters, self.INPUT_FAULTS, context)
-        strati_column = self.parameterAsSource(parameters, self.INPUT_STRATI_COLUMN, context)
+        geology = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
+        faults = self.parameterAsVectorLayer(parameters, self.INPUT_FAULTS, context)
+        strati_column = self.parameterAsString(parameters, self.INPUT_STRATI_COLUMN, context)
+
+        if strati_column and strati_column.strip():
+            strati_column = [unit.strip() for unit in strati_column.split(',')]
+        
+        unit_name_field = self.parameterAsString(parameters, 'UNIT_NAME_FIELD', context)
         
         geology = qgsLayerToGeoDataFrame(geology)
         faults = qgsLayerToGeoDataFrame(faults) if faults else None
         
+        if unit_name_field != 'UNITNAME' and unit_name_field in geology.columns:
+            geology = geology.rename(columns={unit_name_field: 'UNITNAME'})
+        
         feedback.pushInfo("Extracting Basal Contacts...")
-        contact_extractor = ContactExtractor(geology, faults, feedback)
-        contact_extractor.extract_basal_contacts(strati_column)
-    
+        contact_extractor = ContactExtractor(geology, faults)
+        basal_contacts = contact_extractor.extract_basal_contacts(strati_column)
+        
         basal_contacts = GeoDataFrameToQgsLayer(
             self, 
             contact_extractor.basal_contacts,
             parameters=parameters,
             context=context,
+            output_key=self.OUTPUT,
             feedback=feedback,
             )
         return {self.OUTPUT: basal_contacts}
