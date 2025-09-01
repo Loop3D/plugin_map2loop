@@ -58,13 +58,13 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         return "loop_sorter"
 
     def displayName(self) -> str:
-        return "loop: Stratigraphic sorter"
+        return "Loop3d: Stratigraphic sorter"
 
     def group(self) -> str:
         return "Loop3d"
 
     def groupId(self) -> str:
-        return "loop3d"
+        return "Loop3d"
 
     # ----------------------------------------------------------
     #  Parameters
