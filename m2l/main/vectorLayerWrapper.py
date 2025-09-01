@@ -38,14 +38,12 @@ def qgsLayerToGeoDataFrame(layer) -> gpd.GeoDataFrame:
             continue
         data['geometry'].append(geom)
         for f in fields:
-            data[f.name()].append(feature[f.name()])
-    gdf = gpd.GeoDataFrame(data, crs=layer.crs().authid())
-
-    # ✅ Convert only QGIS string fields to pandas string dtype
-    for f in fields:
-        if f.type() == QVariant.String and f.name() in gdf.columns:
-            gdf[f.name()] = gdf[f.name()].astype(str)
-    return gdf
+            if f.type() == QVariant.String:
+                # Ensure string fields are converted to str, not QVariant
+                data[f.name()].append(str(feature[f.name()]))
+            else:
+                data[f.name()].append(feature[f.name()])
+    return gpd.GeoDataFrame(data, crs=layer.crs().authid())
 
 def qgsLayerToDataFrame(layer, dtm) -> pd.DataFrame:
     """Convert a vector layer to a pandas DataFrame
