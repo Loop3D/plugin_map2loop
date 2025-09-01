@@ -16,7 +16,7 @@ from m2l.__about__ import (
     __version__,
 )
 
-from .algorithms import BasalContactsAlgorithm
+from .algorithms import BasalContactsAlgorithm, SamplerAlgorithm
 
 # ############################################################################
 # ########## Classes ###############
@@ -29,6 +29,7 @@ class Map2LoopProvider(QgsProcessingProvider):
     def loadAlgorithms(self):
         """Loads all algorithms belonging to this provider."""
         self.addAlgorithm(BasalContactsAlgorithm())
+        self.addAlgorithm(SamplerAlgorithm())
         pass
 
     def id(self) -> str:
