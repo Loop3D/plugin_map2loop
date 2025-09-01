@@ -14,9 +14,10 @@ from qgis.core import (
         QgsPointXY,
     )
 
-from qgis.PyQt.QtCore import QVariant, QDateTime
+from qgis.PyQt.QtCore import QVariant, QDateTime, QVariant
 
 from shapely.geometry import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
+from shapely.wkb import loads as wkb_loads
 import pandas as pd
 import geopandas as gpd
 import numpy as np
