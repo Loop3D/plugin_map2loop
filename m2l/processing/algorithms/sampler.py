@@ -32,7 +32,7 @@ from qgis.core import (
 )
 # Internal imports
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame
-from map2loop.map2loop.sampler import SamplerDecimator, SamplerSpacing
+from map2loop.sampler import SamplerDecimator, SamplerSpacing
 
 
 class SamplerAlgorithm(QgsProcessingAlgorithm):

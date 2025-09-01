@@ -22,7 +22,7 @@ from qgis.core import (
 # ────────────────────────────────────────────────
 #  map2loop sorters
 # ────────────────────────────────────────────────
-from map2loop.map2loop.sorter import (
+from map2loop.sorter import (
     SorterAlpha,
     SorterAgeBased,
     SorterMaximiseContacts,

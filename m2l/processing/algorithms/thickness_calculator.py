@@ -29,7 +29,7 @@ from qgis.core import (
 )
 # Internal imports
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer, qgsLayerToDataFrame, dataframeToQgsLayer
-from map2loop.map2loop.thickness_calculator import InterpolatedStructure, StructuralPoint
+from map2loop.thickness_calculator import InterpolatedStructure, StructuralPoint
 
 
 class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
