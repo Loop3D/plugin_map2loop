@@ -9,7 +9,8 @@ from qgis.core import (
         QgsWkbTypes, 
         QgsCoordinateReferenceSystem, 
         QgsFeatureSink,
-        QgsProcessingException
+        QgsProcessingException,
+        QgsPoint
     )
 
 from qgis.PyQt.QtCore import QVariant, QDateTime
