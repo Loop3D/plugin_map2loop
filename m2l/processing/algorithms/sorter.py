@@ -177,7 +177,7 @@ def build_input_frames(layer: QgsVectorLayer, feedback) -> tuple:
     (units_df, relationships_df, contacts_df, map_data)
     """
     import pandas as pd
-    from map2loop.map2loop.mapdata import MapData  # adjust import path if needed
+    from m2l.map2loop.mapdata import MapData  # adjust import path if needed
 
     # Example: convert the geology layer to a very small units_df
     units_records = []

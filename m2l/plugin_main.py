@@ -15,17 +15,17 @@ from qgis.PyQt.QtGui import QDesktopServices, QIcon
 from qgis.PyQt.QtWidgets import QAction
 
 # project
-from map2loop.__about__ import (
+from m2l.__about__ import (
     DIR_PLUGIN_ROOT,
     __icon_path__,
     __title__,
     __uri_homepage__,
 )
-from map2loop.gui.dlg_settings import PlgOptionsFactory
-from map2loop.processing import (
+from m2l.gui.dlg_settings import PlgOptionsFactory
+from m2l.processing import (
     Map2LoopProvider,
 )
-from map2loop.toolbelt import PlgLogger
+from m2l.toolbelt import PlgLogger
 
 # ############################################################################
 # ########## Classes ###############

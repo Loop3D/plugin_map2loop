@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from map2loop.toolbelt.env_var_parser import EnvVarParser
+from m2l.toolbelt.env_var_parser import EnvVarParser
 
 
 class TestEnvVarParser(unittest.TestCase):
