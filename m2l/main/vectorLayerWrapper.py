@@ -38,11 +38,7 @@ def qgsLayerToGeoDataFrame(layer) -> gpd.GeoDataFrame:
             continue
         data['geometry'].append(geom)
         for f in fields:
-            if f.type() == QVariant.String:
-                # Ensure string fields are converted to str, not QVariant
-                data[f.name()].append(str(feature[f.name()]))
-            else:
-                data[f.name()].append(feature[f.name()])
+            data[f.name()].append(feature[f.name()])
     return gpd.GeoDataFrame(data, crs=layer.crs().authid())
 
 def qgsLayerToDataFrame(layer, dtm) -> pd.DataFrame:
