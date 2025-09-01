@@ -117,7 +117,6 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
         unit_name_field = self.parameterAsString(parameters, 'UNIT_NAME_FIELD', context)
         
         geology = qgsLayerToGeoDataFrame(geology)
-        geology['UNITNAME'] = geology['UNITNAME'].astype(str)
 
         faults = qgsLayerToGeoDataFrame(faults) if faults else None
         if unit_name_field != 'UNITNAME' and unit_name_field in geology.columns:
