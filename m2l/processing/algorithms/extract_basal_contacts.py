@@ -28,8 +28,6 @@ from qgis.core import (
 # Internal imports
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer
 from map2loop.contact_extractor import ContactExtractor
-from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer 
-from map2loop.contact_extractor import ContactExtractor
 
 
 class BasalContactsAlgorithm(QgsProcessingAlgorithm):
@@ -112,15 +110,16 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
         geology = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
         faults = self.parameterAsVectorLayer(parameters, self.INPUT_FAULTS, context)
         strati_column = self.parameterAsString(parameters, self.INPUT_STRATI_COLUMN, context)
-
+        
         if strati_column and strati_column.strip():
             strati_column = [unit.strip() for unit in strati_column.split(',')]
         
         unit_name_field = self.parameterAsString(parameters, 'UNIT_NAME_FIELD', context)
         
         geology = qgsLayerToGeoDataFrame(geology)
+        geology['UNITNAME'] = geology['UNITNAME'].astype(str)
+
         faults = qgsLayerToGeoDataFrame(faults) if faults else None
-        
         if unit_name_field != 'UNITNAME' and unit_name_field in geology.columns:
             geology = geology.rename(columns={unit_name_field: 'UNITNAME'})
         
