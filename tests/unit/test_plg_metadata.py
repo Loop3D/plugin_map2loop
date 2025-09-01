@@ -18,7 +18,7 @@ from pathlib import Path
 from packaging.version import parse
 
 # project
-from map2loop import __about__
+from m2l import __about__
 
 # ############################################################################
 # ########## Classes #############
