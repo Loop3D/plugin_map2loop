@@ -11,7 +11,7 @@ from qgis.core import (
         QgsFeatureSink,
         QgsProcessingException,
         QgsPoint,
-        QgsPointXY
+        QgsPointXY,
     )
 
 from qgis.PyQt.QtCore import QVariant, QDateTime
@@ -394,7 +394,7 @@ def dataframeToQgsLayer(
     attr_columns = [f.name() for f in fields]
 
     # Iterate rows and write features
-    for i, (idx, row) in enumerate(df.iterrows(), start=1):
+    for i, (_idx, row) in enumerate(df.iterrows(), start=1):
         if feedback.isCanceled():
             break
 
