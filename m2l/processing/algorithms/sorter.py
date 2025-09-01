@@ -74,7 +74,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr("Geology polygons"),
+                "Geology polygons",
                 [QgsProcessing.TypeVectorPolygon],
             )
         )
@@ -83,7 +83,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterEnum(
                 self.ALGO,
-                self.tr("Sorting strategy"),
+                "Sorting strategy",
                 options=list(SORTER_LIST.keys()),
                 defaultValue=0,                       # Age-based is safest default
             )

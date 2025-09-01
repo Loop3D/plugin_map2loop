@@ -78,7 +78,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFeatureSource(
                 self.INPUT_DTM,
                 "DTM",
-                [QgsProcessing.TypeVectorRaster],
+                [QgsProcessing.TypeRaster],
             )
         )
         

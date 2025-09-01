@@ -79,7 +79,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFeatureSource(
                 self.INPUT_DTM,
                 "DTM",
-                [QgsProcessing.TypeVectorRaster],
+                [QgsProcessing.TypeRaster],
             )
         )
         self.addParameter(
