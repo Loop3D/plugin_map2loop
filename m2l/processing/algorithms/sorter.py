@@ -92,7 +92,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr("Stratigraphic column"),
+                "Stratigraphic column",
             )
         )
 
