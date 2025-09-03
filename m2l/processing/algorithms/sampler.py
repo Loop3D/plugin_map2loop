@@ -32,7 +32,7 @@ from qgis.core import (
 )
 # Internal imports
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame
-from map2loop.map2loop.sampler import SamplerDecimator, SamplerSpacing
+from map2loop.sampler import SamplerDecimator, SamplerSpacing
 
 
 class SamplerAlgorithm(QgsProcessingAlgorithm):
@@ -61,7 +61,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
 
     def groupId(self) -> str:
         """Return the algorithm group ID."""
-        return "loop3d"
+        return "Loop3d"
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
@@ -78,7 +78,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFeatureSource(
                 self.INPUT_DTM,
                 "DTM",
-                [QgsProcessing.TypeVectorRaster],
+                [QgsProcessing.TypeRaster],
             )
         )
         

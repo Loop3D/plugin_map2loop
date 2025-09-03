@@ -16,7 +16,12 @@ from m2l.__about__ import (
     __version__,
 )
 
-from .algorithms import BasalContactsAlgorithm
+from .algorithms import (
+    BasalContactsAlgorithm,
+    StratigraphySorterAlgorithm,
+    ThicknessCalculatorAlgorithm,
+    SamplerAlgorithm
+)
 
 # ############################################################################
 # ########## Classes ###############
@@ -29,7 +34,9 @@ class Map2LoopProvider(QgsProcessingProvider):
     def loadAlgorithms(self):
         """Loads all algorithms belonging to this provider."""
         self.addAlgorithm(BasalContactsAlgorithm())
-        pass
+        self.addAlgorithm(StratigraphySorterAlgorithm())
+        self.addAlgorithm(ThicknessCalculatorAlgorithm())
+        self.addAlgorithm(SamplerAlgorithm())
 
     def id(self) -> str:
         """Unique provider id, used for identifying it. This string should be unique, \

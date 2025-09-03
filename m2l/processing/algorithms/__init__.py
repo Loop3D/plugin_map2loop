@@ -1,1 +1,4 @@
 from .extract_basal_contacts import BasalContactsAlgorithm
+from .sorter import StratigraphySorterAlgorithm
+from .thickness_calculator import ThicknessCalculatorAlgorithm
+from .sampler import SamplerAlgorithm
