@@ -46,9 +46,10 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
     Creates a one-column ‘stratigraphic column’ table ordered
     by the selected map2loop sorter.
     """
-
-    INPUT = "INPUT"
-    ALGO  = "SORT_ALGO"
+    METHOD = "METHOD"
+    INPUT_GEOLOGY = "INPUT_GEOLOGY"
+    INPUT_STRATI_COLUMN = "INPUT_STRATI_COLUMN"
+    SORTING_ALGORITHM  = "SORTING_ALGORITHM"
     OUTPUT = "OUTPUT"
 
     # ----------------------------------------------------------
@@ -65,6 +66,19 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 
     def groupId(self) -> str:
         return "Loop3d"
+    
+    def updateParameters(self, parameters):
+        selected_method = parameters.get(self.METHOD, 0)
+        if selected_method == 0:  # User-Defined selected
+            self.parameterDefinition(self.INPUT_STRATI_COLUMN).setMetadata({'widget_wrapper': {'visible': True}})
+            self.parameterDefinition(self.SORTING_ALGORITHM).setMetadata({'widget_wrapper': {'visible': False}})
+            self.parameterDefinition(self.INPUT_GEOLOGY).setMetadata({'widget_wrapper': {'visible': False}})
+        else:  # Automatic selected
+            self.parameterDefinition(self.INPUT_GEOLOGY).setMetadata({'widget_wrapper': {'visible': True}})
+            self.parameterDefinition(self.SORTING_ALGORITHM).setMetadata({'widget_wrapper': {'visible': True}})
+            self.parameterDefinition(self.INPUT_STRATI_COLUMN).setMetadata({'widget_wrapper': {'visible': False}})
+            
+        return super().updateParameters(parameters)
 
     # ----------------------------------------------------------
     #  Parameters
@@ -72,12 +86,21 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
 
         self.addParameter(
+            QgsProcessingParameterEnum(
+                name=self.METHOD,
+                description='Select Method',
+                options=['User-Defined', 'Automatic'],
+                defaultValue=0
+            )
+        )
+        self.addParameter(
             QgsProcessingParameterFeatureSource(
-                self.INPUT,
+                self.INPUT_GEOLOGY,
                 "Geology polygons",
                 [QgsProcessing.TypeVectorPolygon],
             )
         )
+        
 
         # enum so the user can pick the strategy from a dropdown
         self.addParameter(
