@@ -186,7 +186,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         )
 
         if samples is not None and not samples.empty:
-            for index, row in samples.iterrows():
+            for _index, row in samples.iterrows():
                 feature = QgsFeature(fields)
                 
                 # decimator has z values
