@@ -9,12 +9,15 @@ from qgis.core import (
         QgsWkbTypes, 
         QgsCoordinateReferenceSystem, 
         QgsFeatureSink,
-        QgsProcessingException
+        QgsProcessingException,
+        QgsPoint,
+        QgsPointXY,
     )
 
-from qgis.PyQt.QtCore import QVariant, QDateTime
+from qgis.PyQt.QtCore import QVariant, QDateTime, QVariant
 
 from shapely.geometry import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
+from shapely.wkb import loads as wkb_loads
 import pandas as pd
 import geopandas as gpd
 import numpy as np
@@ -35,9 +38,11 @@ def qgsLayerToGeoDataFrame(layer) -> gpd.GeoDataFrame:
             continue
         data['geometry'].append(geom)
         for f in fields:
-            data[f.name()].append(feature[f.name()])
+            if f.type() == QVariant.String:
+                data[f.name()].append(str(feature[f.name()]))
+            else:
+                data[f.name()].append(feature[f.name()])
     return gpd.GeoDataFrame(data, crs=layer.crs().authid())
-
 
 def qgsLayerToDataFrame(layer, dtm) -> pd.DataFrame:
     """Convert a vector layer to a pandas DataFrame
@@ -392,7 +397,7 @@ def dataframeToQgsLayer(
     attr_columns = [f.name() for f in fields]
 
     # Iterate rows and write features
-    for i, (idx, row) in enumerate(df.iterrows(), start=1):
+    for i, (_idx, row) in enumerate(df.iterrows(), start=1):
         if feedback.isCanceled():
             break
 

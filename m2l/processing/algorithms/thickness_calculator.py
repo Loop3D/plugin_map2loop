@@ -29,7 +29,7 @@ from qgis.core import (
 )
 # Internal imports
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, GeoDataFrameToQgsLayer, qgsLayerToDataFrame, dataframeToQgsLayer
-from map2loop.map2loop.thickness_calculator import InterpolatedStructure, StructuralPoint
+from map2loop.thickness_calculator import InterpolatedStructure, StructuralPoint
 
 
 class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
@@ -62,7 +62,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
 
     def groupId(self) -> str:
         """Return the algorithm group ID."""
-        return "loop3d"
+        return "Loop3d"
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
@@ -79,7 +79,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFeatureSource(
                 self.INPUT_DTM,
                 "DTM",
-                [QgsProcessing.TypeVectorRaster],
+                [QgsProcessing.TypeRaster],
             )
         )
         self.addParameter(

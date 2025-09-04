@@ -67,7 +67,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
 
     def groupId(self) -> str:
         """Return the algorithm group ID."""
-        return "loop3d"
+        return "Loop3d"
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
@@ -86,6 +86,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterRasterLayer(
                 self.INPUT_DTM,
                 "DTM",
+                [QgsProcessing.TypeRaster],
             )
         )
         

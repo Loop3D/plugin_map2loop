@@ -22,7 +22,7 @@ from qgis.core import (
 # ────────────────────────────────────────────────
 #  map2loop sorters
 # ────────────────────────────────────────────────
-from map2loop.map2loop.sorter import (
+from map2loop.sorter import (
     SorterAlpha,
     SorterAgeBased,
     SorterMaximiseContacts,
@@ -58,13 +58,13 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         return "loop_sorter"
 
     def displayName(self) -> str:
-        return "loop: Stratigraphic sorter"
+        return "Loop3d: Stratigraphic sorter"
 
     def group(self) -> str:
         return "Loop3d"
 
     def groupId(self) -> str:
-        return "loop3d"
+        return "Loop3d"
 
     # ----------------------------------------------------------
     #  Parameters
@@ -74,7 +74,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
-                self.tr("Geology polygons"),
+                "Geology polygons",
                 [QgsProcessing.TypeVectorPolygon],
             )
         )
@@ -83,7 +83,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterEnum(
                 self.ALGO,
-                self.tr("Sorting strategy"),
+                "Sorting strategy",
                 options=list(SORTER_LIST.keys()),
                 defaultValue=0,                       # Age-based is safest default
             )
@@ -92,7 +92,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr("Stratigraphic column"),
+                "Stratigraphic column",
             )
         )
 
@@ -177,7 +177,7 @@ def build_input_frames(layer: QgsVectorLayer, feedback) -> tuple:
     (units_df, relationships_df, contacts_df, map_data)
     """
     import pandas as pd
-    from m2l.map2loop.mapdata import MapData  # adjust import path if needed
+    from map2loop.map2loop.mapdata import MapData  # adjust import path if needed
 
     # Example: convert the geology layer to a very small units_df
     units_records = []
