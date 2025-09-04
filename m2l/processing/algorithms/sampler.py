@@ -112,6 +112,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterNumber(
                 self.INPUT_DECIMATION,
                 "DECIMATION",
+                QgsProcessingParameterNumber.Integer,
                 defaultValue=1,
                 optional=True,
             )
@@ -121,6 +122,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterNumber(
                 self.INPUT_SPACING,
                 "SPACING",
+                QgsProcessingParameterNumber.Double,
                 defaultValue=200.0,
                 optional=True,
             )
@@ -129,7 +131,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                "Sampled Contacts",
+                "Sampled Points",
             )
         )
 
@@ -143,7 +145,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         dtm = self.parameterAsRasterLayer(parameters, self.INPUT_DTM, context)
         geology = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
         spatial_data = self.parameterAsVectorLayer(parameters, self.INPUT_SPATIAL_DATA, context)
-        decimation = self.parameterAsDouble(parameters, self.INPUT_DECIMATION, context)
+        decimation = self.parameterAsInt(parameters, self.INPUT_DECIMATION, context)
         spacing = self.parameterAsDouble(parameters, self.INPUT_SPACING, context)
         sampler_type_index = self.parameterAsEnum(parameters, self.INPUT_SAMPLER_TYPE, context)
         sampler_type = ["Decimator", "Spacing"][sampler_type_index]
