@@ -83,6 +83,7 @@ jobs:
           . .venv/bin/activate
           # Install the requirements
           python3 -m pip install -U -r requirements/testing.txt
+          python3 -m pip install git+https://github.com/Loop3D/map2loop.git@noelle/contact_extractor
 
       - name: verify input data
         run: |
