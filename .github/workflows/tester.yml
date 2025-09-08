@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: qgis/qgis:3.4
+      image: qgis/qgis:latest
       env:
         CI: true
         DISPLAY: ":1"
