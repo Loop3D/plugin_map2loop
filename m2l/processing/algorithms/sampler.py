@@ -87,6 +87,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
                 self.INPUT_DTM,
                 "DTM",
                 [QgsProcessing.TypeRaster],
+                optional=True,
             )
         )
         
@@ -149,11 +150,20 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         spacing = self.parameterAsDouble(parameters, self.INPUT_SPACING, context)
         sampler_type_index = self.parameterAsEnum(parameters, self.INPUT_SAMPLER_TYPE, context)
         sampler_type = ["Decimator", "Spacing"][sampler_type_index]
+
+        if spatial_data is None:
+            raise QgsProcessingException("Spatial data is required")
+        
+        if sampler_type is "Decimator":
+            if geology is None:
+                raise QgsProcessingException("Geology is required")
+            if dtm is None:
+                raise QgsProcessingException("DTM is required")
         
         # Convert geology layers to GeoDataFrames
         geology = qgsLayerToGeoDataFrame(geology)
         spatial_data_gdf = qgsLayerToGeoDataFrame(spatial_data)
-        dtm_gdal = gdal.Open(dtm.source())
+        dtm_gdal = gdal.Open(dtm.source()) if dtm is not None and dtm.isValid() else None
         
         if sampler_type == "Decimator":
             feedback.pushInfo("Sampling...")
