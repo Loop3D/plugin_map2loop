@@ -43,23 +43,23 @@ class TestBasalContacts(unittest.TestCase):
         QgsMessageLog.logMessage(f"geology layer: {geology_layer.featureCount()} features", "TestBasalContacts", Qgis.Critical)
         
         strati_column = [
-            ["Turee Creek Group"],
-            ["Boolgeeda Iron Formation"],
-            ["Woongarra Rhyolite"],
-            ["Weeli Wolli Formation"],
-            ["Brockman Iron Formation"],
-            ["Mount McRae Shale and Mount Sylvia Formation"],
-            ["Wittenoom Formation"],
-            ["Marra Mamba Iron Formation"],
-            ["Jeerinah Formation"],
-            ["Bunjinah Formation"],
-            ["Pyradie Formation"],
-            ["Fortescue Group"],
-            ["Hardey Formation"],
-            ["Boongal Formation"],
-            ["Mount Roe Basalt"],
-            ["Rocklea Inlier greenstones"],
-            ["Rocklea Inlier metagranitic unit"]
+            "Turee Creek Group",
+            "Boolgeeda Iron Formation",
+            "Woongarra Rhyolite",
+            "Weeli Wolli Formation",
+            "Brockman Iron Formation",
+            "Mount McRae Shale and Mount Sylvia Formation",
+            "Wittenoom Formation",
+            "Marra Mamba Iron Formation",
+            "Jeerinah Formation",
+            "Bunjinah Formation",
+            "Pyradie Formation",
+            "Fortescue Group",
+            "Hardey Formation",
+            "Boongal Formation",
+            "Mount Roe Basalt",
+            "Rocklea Inlier greenstones",
+            "Rocklea Inlier metagranitic unit"
         ]
 
         algorithm = BasalContactsAlgorithm()
