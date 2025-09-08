@@ -1,22 +1,18 @@
-"""
-qgis python console:
-   ```
-   import sys
-   dir = your_directory_to_the_plugin_code
-   sys.path.append(dir)
-   import unittest
-   from tests.sampler_decimator_test import TestSamplerDecimator
-   suite = unittest.TestLoader().loadTestsFromTestCase(TestSamplerDecimator)
-   unittest.TextTestRunner(verbosity=2).run(suite)
-   ```
-"""
-
 import unittest
 from pathlib import Path
-from qgis.core import QgsVectorLayer, QgsRasterLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis
+from qgis.core import QgsVectorLayer, QgsRasterLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis,QgsApplication
+from qgis.testing import start_app
 from m2l.processing.algorithms.sampler import SamplerAlgorithm
+from m2l.processing.provider import Map2LoopProvider
 
 class TestSamplerDecimator(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.qgs = start_app()
+        
+        cls.provider = Map2LoopProvider()
+        QgsApplication.processingRegistry().addProvider(cls.provider)
 
     def setUp(self):
         self.test_dir = Path(__file__).parent
@@ -93,6 +89,10 @@ class TestSamplerDecimator(unittest.TestCase):
         
         finally:
             QgsMessageLog.logMessage("=" * 50, "TestDecimator", Qgis.Critical)
+    
+    @classmethod
+    def tearDownClass(cls):
+        QgsApplication.processingRegistry().removeProvider(cls.provider)
 
 if __name__ == '__main__':
     unittest.main()
