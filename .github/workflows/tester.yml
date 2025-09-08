@@ -2,16 +2,12 @@ name: "🎳 Tester"
 
 on:
   push:
-    branches:
-      - main
     paths:
       - '**.py'
       - .github/workflows/tester.yml
       - requirements/testing.txt
 
   pull_request:
-    branches:
-      - main
     paths:
       - '**.py'
       - .github/workflows/tester.yml
