@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from qgis.core import QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis, QgsApplication
 from qgis.testing import start_app
-from m2l.processing.algorithms.basal_contacts import BasalContactsAlgorithm
+from m2l.processing.algorithms.extract_basal_contacts import BasalContactsAlgorithm
 from m2l.processing.provider import Map2LoopProvider
 
 class TestBasalContacts(unittest.TestCase):
@@ -61,7 +61,7 @@ class TestBasalContacts(unittest.TestCase):
             ["Rocklea Inlier greenstones"],
             ["Rocklea Inlier metagranitic unit"]
         ]
-        
+
         algorithm = BasalContactsAlgorithm()
         algorithm.initAlgorithm()
 
