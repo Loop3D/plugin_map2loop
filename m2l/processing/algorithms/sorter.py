@@ -1,5 +1,7 @@
 from typing import Any, Optional
+from osgeo import gdal
 
+from PyQt5.QtCore import QMetaType
 from qgis import processing
 from qgis.core import (
     QgsFeatureSink,
@@ -7,6 +9,7 @@ from qgis.core import (
     QgsField, 
     QgsFeature, 
     QgsGeometry,
+    QgsRasterLayer,
     QgsProcessing,
     QgsProcessingAlgorithm,
     QgsProcessingContext,
@@ -15,6 +18,8 @@ from qgis.core import (
     QgsProcessingParameterEnum,
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterFeatureSource,
+    QgsProcessingParameterField,
+    QgsProcessingParameterRasterLayer,
     QgsVectorLayer,
     QgsWkbTypes
 )
@@ -48,6 +53,8 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
     """
     METHOD = "METHOD"
     INPUT_GEOLOGY = "INPUT_GEOLOGY"
+    INPUT_STRUCTURE = "INPUT_STRUCTURE"
+    INPUT_DTM = "INPUT_DTM"
     INPUT_STRATI_COLUMN = "INPUT_STRATI_COLUMN"
     SORTING_ALGORITHM  = "SORTING_ALGORITHM"
     OUTPUT = "OUTPUT"
@@ -100,12 +107,62 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 [QgsProcessing.TypeVectorPolygon],
             )
         )
+
+        self.addParameter(
+        QgsProcessingParameterFeatureSource(
+                self.INPUT_STRUCTURE,
+                "Structure",
+                [QgsProcessing.TypeVectorPoint],
+                optional=True,
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterRasterLayer(
+                self.INPUT_DTM,
+                "DTM",
+                optional=True,
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterField(
+                'MIN_AGE_FIELD',
+                'Minimum Age Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.String,
+                defaultValue='MIN_AGE',
+                optional=True
+            )
+        )
+    
+        self.addParameter(
+            QgsProcessingParameterField(
+                'MAX_AGE_FIELD',
+                'Maximum Age Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.String,
+                defaultValue='MAX_AGE',
+                optional=True
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterField(
+                'GROUP_FIELD',
+                'Group Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.String,
+                defaultValue='GROUP',
+                optional=True
+            )
+        )
         
 
         # enum so the user can pick the strategy from a dropdown
         self.addParameter(
             QgsProcessingParameterEnum(
-                self.ALGO,
+                self.SORTING_ALGORITHM,
                 "Sorting strategy",
                 options=list(SORTER_LIST.keys()),
                 defaultValue=0,                       # Age-based is safest default
@@ -115,7 +172,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr("Stratigraphic column"),
+                "Stratigraphic column",
             )
         )
 
@@ -130,8 +187,10 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
     ) -> dict[str, Any]:
 
         # 1 ► fetch user selections
-        in_layer: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.INPUT, context)
-        algo_index: int          = self.parameterAsEnum(parameters, self.ALGO, context)
+        in_layer: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
+        structure: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.INPUT_STRUCTURE, context)
+        dtm: QgsRasterLayer = self.parameterAsRasterLayer(parameters, self.INPUT_DTM, context)
+        algo_index: int          = self.parameterAsEnum(parameters, self.SORTING_ALGORITHM, context)
         sorter_cls               = list(SORTER_LIST.values())[algo_index]
 
         feedback.pushInfo(f"Using sorter: {sorter_cls.__name__}")
@@ -150,21 +209,34 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         #
         # NB: map2loop does *not* need geometries – only attribute values.
         # --------------------------------------------------
-        units_df, relationships_df, contacts_df, map_data = build_input_frames(in_layer, feedback)
+        units_df, relationships_df, contacts_df = build_input_frames(in_layer, feedback,parameters)
 
         # 3 ► run the sorter
         sorter = sorter_cls()                     # instantiation is always zero-argument
-        order  = sorter.sort(
-            units_df,
-            relationships_df,
-            contacts_df,
-            map_data,
-        )
+        if sorter_cls == SorterObservationProjections:
+            from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame
+            geology_gdf = qgsLayerToGeoDataFrame(in_layer)
+            structure_gdf = qgsLayerToGeoDataFrame(structure)
+            dtm_gdal = gdal.Open(dtm.source()) if dtm is not None and dtm.isValid() else None
+            order = sorter.sort(
+                units_df,
+                relationships_df,
+                contacts_df,
+                geology_gdf,
+                structure_gdf,
+                dtm_gdal
+            )
+        else:
+            order  = sorter.sort(
+                units_df,
+                relationships_df,
+                contacts_df,
+            )
 
         # 4 ► write an in-memory table with the result
         sink_fields = QgsFields()
-        sink_fields.append(QgsField("strat_pos", int))
-        sink_fields.append(QgsField("unit_name", str))
+        sink_fields.append(QgsField("strat_pos", QMetaType.Type.Int))
+        sink_fields.append(QgsField("unit_name", QMetaType.Type.QString))
 
         (sink, dest_id) = self.parameterAsSink(
             parameters,
@@ -190,17 +262,21 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 # -------------------------------------------------------------------------
 #  Helper stub – you must replace with *your* conversion logic
 # -------------------------------------------------------------------------
-def build_input_frames(layer: QgsVectorLayer, feedback) -> tuple:
+def build_input_frames(layer: QgsVectorLayer, feedback, parameters) -> tuple:
     """
     Placeholder that turns the geology layer (and any other project
     layers) into the four objects required by the sorter.
 
     Returns
     -------
-    (units_df, relationships_df, contacts_df, map_data)
+    (units_df, relationships_df, contacts_df)
     """
     import pandas as pd
-    from m2l.map2loop.mapdata import MapData  # adjust import path if needed
+
+    unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
+    min_age_field = parameters.get('MIN_AGE_FIELD', 'MIN_AGE') if parameters else 'MIN_AGE'
+    max_age_field = parameters.get('MAX_AGE_FIELD', 'MAX_AGE') if parameters else 'MAX_AGE'
+    group_field = parameters.get('GROUP_FIELD', 'GROUP') if parameters else 'GROUP'
 
     # Example: convert the geology layer to a very small units_df
     units_records = []
@@ -208,10 +284,10 @@ def build_input_frames(layer: QgsVectorLayer, feedback) -> tuple:
         units_records.append(
             dict(
                 layerId=f.id(),
-                name=f["UNITNAME"],           # attribute names → your schema
-                minAge=f.attribute("MIN_AGE"),
-                maxAge=f.attribute("MAX_AGE"),
-                group=f["GROUP"],
+                name=f[unit_name_field],           # attribute names → your schema
+                minAge=float(f[min_age_field]),
+                maxAge=float(f[max_age_field]),
+                group=f[group_field],
             )
         )
     units_df = pd.DataFrame.from_records(units_records)
@@ -221,8 +297,7 @@ def build_input_frames(layer: QgsVectorLayer, feedback) -> tuple:
     contacts_df      = pd.DataFrame(columns=["UNITNAME_1", "UNITNAME_2", "length"])
 
     # map_data can be mocked if you only use Age-based sorter
-    map_data = MapData()   # or MapData.from_project(…) / MapData.from_files(…)
 
     feedback.pushInfo(f"Units → {len(units_df)} records")
 
-    return units_df, relationships_df, contacts_df, map_data
+    return units_df, relationships_df, contacts_df
