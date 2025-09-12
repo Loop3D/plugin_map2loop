@@ -61,6 +61,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
     INPUT_STRATI_COLUMN = "INPUT_STRATI_COLUMN"
     SORTING_ALGORITHM  = "SORTING_ALGORITHM"
     OUTPUT = "OUTPUT"
+    CONTACTS_LAYER = "CONTACTS_LAYER"
 
     # ----------------------------------------------------------
     #  Metadata
