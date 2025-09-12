@@ -80,6 +80,17 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
         )
 
         self.addParameter(
+            QgsProcessingParameterField(
+                'FORMATION_FIELD',
+                'Formation Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.String,
+                defaultValue='formation',
+                optional=True
+            )
+        )
+
+        self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT_FAULTS,
                 "FAULTS",
@@ -135,7 +146,14 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
         geology = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
         faults = self.parameterAsVectorLayer(parameters, self.INPUT_FAULTS, context)
         strati_column = self.parameterAsMatrix(parameters, self.INPUT_STRATI_COLUMN, context)
-        ignore_units = self.parameterAsMatrix(parameters, self.INPUT_IGNORE_UNITS, context) 
+        ignore_units = self.parameterAsMatrix(parameters, self.INPUT_IGNORE_UNITS, context)
+
+        if not strati_column or all(isinstance(unit, str) and not unit.strip() for unit in strati_column):
+            raise QgsProcessingException("no stratigraphic column found")
+        
+        if not ignore_units or all(isinstance(unit, str) and not unit.strip() for unit in ignore_units):
+            feedback.pushInfo("no units to ignore specified")
+        
         # if strati_column and strati_column.strip():
         #     strati_column = [unit.strip() for unit in strati_column.split(',')]
         # Save stratigraphic column settings
@@ -146,10 +164,15 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
         ignore_settings.setValue("m2l/ignore_units", ignore_units)
 
         unit_name_field = self.parameterAsString(parameters, 'UNIT_NAME_FIELD', context)
+        formation_field = self.parameterAsString(parameters, 'FORMATION_FIELD', context)
         
         geology = qgsLayerToGeoDataFrame(geology)
-        mask = ~geology['Formation'].astype(str).str.strip().isin(ignore_units)
-        geology = geology[mask].reset_index(drop=True)
+        if formation_field and formation_field in geology.columns:
+            mask = ~geology[formation_field].astype(str).str.strip().isin(ignore_units)
+            geology = geology[mask].reset_index(drop=True)
+            feedback.pushInfo(f"filtered by formation field: {formation_field}")
+        else:
+            feedback.pushInfo(f"no formation field found: {formation_field}")
         
         faults = qgsLayerToGeoDataFrame(faults) if faults else None
         if unit_name_field != 'UNITNAME' and unit_name_field in geology.columns:
@@ -163,7 +186,7 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
         feedback.pushInfo("Exporting Basal Contacts Layer...")
         basal_contacts = GeoDataFrameToQgsLayer(
             self, 
-            contact_extractor.basal_contacts,
+            basal_contacts,
             parameters=parameters,
             context=context,
             output_key=self.OUTPUT,
