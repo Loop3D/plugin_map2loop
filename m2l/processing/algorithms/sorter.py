@@ -283,11 +283,15 @@ def build_input_frames(layer: QgsVectorLayer, feedback, parameters) -> pd.DataFr
     units_df
     """
     import pandas as pd
+<<<<<<< HEAD
 
     unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
     min_age_field = parameters.get('MIN_AGE_FIELD', 'MIN_AGE') if parameters else 'MIN_AGE'
     max_age_field = parameters.get('MAX_AGE_FIELD', 'MAX_AGE') if parameters else 'MAX_AGE'
     group_field = parameters.get('GROUP_FIELD', 'GROUP') if parameters else 'GROUP'
+=======
+    from map2loop.map2loop.mapdata import MapData  # adjust import path if needed
+>>>>>>> origin/processing/processing_tools_sampler
 
     # Example: convert the geology layer to a very small units_df
     units_records = []
