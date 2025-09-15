@@ -15,10 +15,13 @@ from qgis.core import (
     QgsProcessingParameterEnum,
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterFeatureSource,
+    QgsProcessingParameterMatrix,
     QgsVectorLayer,
-    QgsWkbTypes
+    QgsWkbTypes,
+    QgsSettings
 )
-
+from ...main.vectorLayerWrapper import qgsLayerToDataFrame
+import json
 # ────────────────────────────────────────────────
 #  map2loop sorters
 # ────────────────────────────────────────────────
@@ -41,15 +44,135 @@ SORTER_LIST = {
     "Observation projections": SorterObservationProjections,
 }
 
-class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
+# class AutomaticStratigraphyAlgorithm(QgsProcessingAlgorithm):
+#     """
+#     Creates a one-column ‘stratigraphic column’ table ordered
+#     by the selected map2loop sorter.
+#     """
+#     METHOD = "METHOD"
+#     INPUT_GEOLOGY = "INPUT_GEOLOGY"
+#     INPUT_STRATI_COLUMN = "INPUT_STRATI_COLUMN"
+#     SORTING_ALGORITHM  = "SORTING_ALGORITHM"
+#     OUTPUT = "OUTPUT"
+
+#     # ----------------------------------------------------------
+#     #  Metadata
+#     # ----------------------------------------------------------
+#     def name(self) -> str:
+#         return "loop_sorter"
+
+#     def displayName(self) -> str:
+#         return "Stratigraphy Tools: Automatic Stratigraphic Column"
+
+#     def group(self) -> str:
+#         return "Stratigraphy Tools"
+
+#     def groupId(self) -> str:
+#         return "Loop3d"
+
+#     # ----------------------------------------------------------
+#     #  Parameters
+#     # ----------------------------------------------------------
+#     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
+
+#         self.addParameter(
+#             QgsProcessingParameterFeatureSource(
+#                 self.INPUT_GEOLOGY,
+#                 "Geology polygons",
+#                 [QgsProcessing.TypeVectorPolygon],
+#             )
+#         )
+        
+#         strati_settings = QgsSettings()
+#         last_strati_column = strati_settings.value("m2l/strati_column", "")
+#         self.addParameter(
+#             QgsProcessingParameterMatrix(
+#                 name=self.INPUT_STRATI_COLUMN,
+#                 description="Stratigraphic Order",
+#                 headers=["Unit"],
+#                 numberRows=0,
+#                 defaultValue=last_strati_column
+#             )
+#         )
+
+#         # enum so the user can pick the strategy from a dropdown
+#         self.addParameter(
+#             QgsProcessingParameterEnum(
+#                 self.SORTING_ALGORITHM,
+#                 "Sorting strategy",
+#                 options=list(SORTER_LIST.keys()),
+#                 defaultValue=0,                       # Age-based is safest default
+#             )
+#         ) #:contentReference[oaicite:0]{index=0}
+
+#         self.addParameter(
+#             QgsProcessingParameterFeatureSink(
+#                 self.OUTPUT,
+#                 "Stratigraphic column",
+#             )
+#         )
+
+#     # ----------------------------------------------------------
+#     #  Core
+#     # ----------------------------------------------------------
+#     def processAlgorithm(
+#         self,
+#         parameters: dict[str, Any],
+#         context: QgsProcessingContext,
+#         feedback: QgsProcessingFeedback,
+#     ) -> dict[str, Any]:
+
+#         # 1 ► fetch user selections
+#         geology: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.INPUT, context)
+#         algorithm_index: int          = self.parameterAsEnum(parameters, self.ALGO, context)
+#         sorter_class               = list(SORTER_LIST.values())[algorithm_index]
+
+#         feedback.pushInfo(f"Using sorter: {sorter_class.__name__}")
+
+#         # 2 ► convert QGIS layers / tables to pandas
+#         # geology = 
+
+#         # 3 ► run the sorter
+#         # sorter = sorter_cls()                     # instantiation is always zero-argument
+#         # order  = sorter.sort(
+#         #     units_df,
+#         #     relationships_df,
+#         #     contacts_df,
+#         #     map_data,
+#         # )
+
+#         # 4 ► write an in-memory table with the result
+#         sink_fields = QgsFields()
+#         sink_fields.append(QgsField("strat_pos", int))
+#         sink_fields.append(QgsField("unit_name", str))
+
+#         (sink, dest_id) = self.parameterAsSink(
+#             parameters,
+#             self.OUTPUT,
+#             context,
+#             sink_fields,
+#             QgsWkbTypes.NoGeometry,
+#             geology.sourceCrs(),
+#         )
+
+#         for pos, name in enumerate(order, start=1):
+#             f = QgsFeature(sink_fields)
+#             f.setAttributes([pos, name])
+#             sink.addFeature(f, QgsFeatureSink.FastInsert)
+
+#         return {self.OUTPUT: dest_id}
+
+#     # ----------------------------------------------------------
+#     def createInstance(self) -> QgsProcessingAlgorithm:
+#         return __class__()
+
+
+class UserDefinedStratigraphyAlgorithm(QgsProcessingAlgorithm):
     """
     Creates a one-column ‘stratigraphic column’ table ordered
     by the selected map2loop sorter.
     """
-    METHOD = "METHOD"
-    INPUT_GEOLOGY = "INPUT_GEOLOGY"
     INPUT_STRATI_COLUMN = "INPUT_STRATI_COLUMN"
-    SORTING_ALGORITHM  = "SORTING_ALGORITHM"
     OUTPUT = "OUTPUT"
 
     # ----------------------------------------------------------
@@ -59,63 +182,35 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         return "loop_sorter"
 
     def displayName(self) -> str:
-        return "Loop3d: Stratigraphic sorter"
+        return "Stratigraphy: User-Defined Stratigraphic Column"
 
     def group(self) -> str:
-        return "Loop3d"
+        return "Stratigraphy"
 
     def groupId(self) -> str:
-        return "Loop3d"
-    
-    def updateParameters(self, parameters):
-        selected_method = parameters.get(self.METHOD, 0)
-        if selected_method == 0:  # User-Defined selected
-            self.parameterDefinition(self.INPUT_STRATI_COLUMN).setMetadata({'widget_wrapper': {'visible': True}})
-            self.parameterDefinition(self.SORTING_ALGORITHM).setMetadata({'widget_wrapper': {'visible': False}})
-            self.parameterDefinition(self.INPUT_GEOLOGY).setMetadata({'widget_wrapper': {'visible': False}})
-        else:  # Automatic selected
-            self.parameterDefinition(self.INPUT_GEOLOGY).setMetadata({'widget_wrapper': {'visible': True}})
-            self.parameterDefinition(self.SORTING_ALGORITHM).setMetadata({'widget_wrapper': {'visible': True}})
-            self.parameterDefinition(self.INPUT_STRATI_COLUMN).setMetadata({'widget_wrapper': {'visible': False}})
-            
-        return super().updateParameters(parameters)
+        return "Stratigraphy_Column"
 
     # ----------------------------------------------------------
     #  Parameters
     # ----------------------------------------------------------
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
-
-        self.addParameter(
-            QgsProcessingParameterEnum(
-                name=self.METHOD,
-                description='Select Method',
-                options=['User-Defined', 'Automatic'],
-                defaultValue=0
-            )
-        )
-        self.addParameter(
-            QgsProcessingParameterFeatureSource(
-                self.INPUT_GEOLOGY,
-                "Geology polygons",
-                [QgsProcessing.TypeVectorPolygon],
-            )
-        )
         
-
-        # enum so the user can pick the strategy from a dropdown
+        strati_settings = QgsSettings()
+        last_strati_column = strati_settings.value("m2l/strati_column", "")
         self.addParameter(
-            QgsProcessingParameterEnum(
-                self.ALGO,
-                "Sorting strategy",
-                options=list(SORTER_LIST.keys()),
-                defaultValue=0,                       # Age-based is safest default
+            QgsProcessingParameterMatrix(
+                name=self.INPUT_STRATI_COLUMN,
+                description="Stratigraphic Order",
+                headers=["Unit"],
+                numberRows=0,
+                defaultValue=last_strati_column
             )
-        ) #:contentReference[oaicite:0]{index=0}
+        )
 
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
-                self.tr("Stratigraphic column"),
+                "Stratigraphic column",
             )
         )
 
@@ -128,101 +223,15 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         context: QgsProcessingContext,
         feedback: QgsProcessingFeedback,
     ) -> dict[str, Any]:
+        
+        strati_column = self.parameterAsMatrix(parameters, self.INPUT_STRATI_COLUMN, context)
+        strati_settings = QgsSettings()
+        last_strati_column = strati_settings.value("m2l/strati_column", "")
 
-        # 1 ► fetch user selections
-        in_layer: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.INPUT, context)
-        algo_index: int          = self.parameterAsEnum(parameters, self.ALGO, context)
-        sorter_cls               = list(SORTER_LIST.values())[algo_index]
+        json_list = json.dumps(strati_column)
 
-        feedback.pushInfo(f"Using sorter: {sorter_cls.__name__}")
-
-        # 2 ► convert QGIS layers / tables to pandas
-        # --------------------------------------------------
-        # You must supply these three DataFrames:
-        #   units_df           — required         (layerId, name, minAge, maxAge, group)
-        #   relationships_df   — required         (Index1 / Unitname1, Index2 / Unitname2 …)
-        #   contacts_df        — required for all but Age‐based
-        #
-        # Typical workflow:
-        #   • iterate over in_layer.getFeatures()
-        #   • build dicts/lists
-        #   • pd.DataFrame(…)
-        #
-        # NB: map2loop does *not* need geometries – only attribute values.
-        # --------------------------------------------------
-        units_df, relationships_df, contacts_df, map_data = build_input_frames(in_layer, feedback)
-
-        # 3 ► run the sorter
-        sorter = sorter_cls()                     # instantiation is always zero-argument
-        order  = sorter.sort(
-            units_df,
-            relationships_df,
-            contacts_df,
-            map_data,
-        )
-
-        # 4 ► write an in-memory table with the result
-        sink_fields = QgsFields()
-        sink_fields.append(QgsField("strat_pos", int))
-        sink_fields.append(QgsField("unit_name", str))
-
-        (sink, dest_id) = self.parameterAsSink(
-            parameters,
-            self.OUTPUT,
-            context,
-            sink_fields,
-            QgsWkbTypes.NoGeometry,
-            in_layer.sourceCrs(),
-        )
-
-        for pos, name in enumerate(order, start=1):
-            f = QgsFeature(sink_fields)
-            f.setAttributes([pos, name])
-            sink.addFeature(f, QgsFeatureSink.FastInsert)
-
-        return {self.OUTPUT: dest_id}
+        return {self.OUTPUT: json_list}
 
     # ----------------------------------------------------------
     def createInstance(self) -> QgsProcessingAlgorithm:
-        return StratigraphySorterAlgorithm()
-
-
-# -------------------------------------------------------------------------
-#  Helper stub – you must replace with *your* conversion logic
-# -------------------------------------------------------------------------
-def build_input_frames(layer: QgsVectorLayer, feedback) -> tuple:
-    """
-    Placeholder that turns the geology layer (and any other project
-    layers) into the four objects required by the sorter.
-
-    Returns
-    -------
-    (units_df, relationships_df, contacts_df, map_data)
-    """
-    import pandas as pd
-    from m2l.map2loop.mapdata import MapData  # adjust import path if needed
-
-    # Example: convert the geology layer to a very small units_df
-    units_records = []
-    for f in layer.getFeatures():
-        units_records.append(
-            dict(
-                layerId=f.id(),
-                name=f["UNITNAME"],           # attribute names → your schema
-                minAge=f.attribute("MIN_AGE"),
-                maxAge=f.attribute("MAX_AGE"),
-                group=f["GROUP"],
-            )
-        )
-    units_df = pd.DataFrame.from_records(units_records)
-
-    # relationships_df and contacts_df are domain-specific ─ fill them here
-    relationships_df = pd.DataFrame(columns=["Index1", "UNITNAME_1", "Index2", "UNITNAME_2"])
-    contacts_df      = pd.DataFrame(columns=["UNITNAME_1", "UNITNAME_2", "length"])
-
-    # map_data can be mocked if you only use Age-based sorter
-    map_data = MapData()   # or MapData.from_project(…) / MapData.from_files(…)
-
-    feedback.pushInfo(f"Units → {len(units_df)} records")
-
-    return units_df, relationships_df, contacts_df, map_data
+        return __class__()

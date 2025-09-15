@@ -1,8 +1,5 @@
 # Develoment dependencies
 # -----------------------
 
-black
-
-
 isort>=5.13
 pre-commit>=4,<5
