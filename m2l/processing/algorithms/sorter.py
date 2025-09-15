@@ -36,7 +36,6 @@ from map2loop.sorter import (
     SorterUseNetworkX,
     SorterUseHint,      # kept for backwards compatibility
 )
-from map2loop.contact_extractor import ContactExtractor
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame
 
 # a lookup so we don’t need a giant if/else block
@@ -113,11 +112,85 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         )
 
         self.addParameter(
+            QgsProcessingParameterField(
+                'UNIT_NAME_FIELD',
+                'Unit Name Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.Any,
+                defaultValue='UNITNAME',
+                optional=True
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterField(
+                'MIN_AGE_FIELD',
+                'Minimum Age Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.Any,
+                defaultValue='MIN_AGE',
+                optional=True
+            )
+        )
+    
+        self.addParameter(
+            QgsProcessingParameterField(
+                'MAX_AGE_FIELD',
+                'Maximum Age Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.Any,
+                defaultValue='MAX_AGE',
+                optional=True
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterField(
+                'GROUP_FIELD',
+                'Group Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.Any,
+                defaultValue='GROUP',
+                optional=True
+            )
+        )
+
+        self.addParameter(
         QgsProcessingParameterFeatureSource(
                 self.INPUT_STRUCTURE,
                 "Structure",
                 [QgsProcessing.TypeVectorPoint],
                 optional=True,
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterField(
+                'DIP_FIELD',
+                'Dip Field',
+                parentLayerParameterName=self.INPUT_STRUCTURE,
+                type=QgsProcessingParameterField.Any,
+                defaultValue='DIP',
+                optional=True
+            )
+        )
+        self.addParameter(
+            QgsProcessingParameterField(
+                'DIPDIR_FIELD',
+                'Dip Direction Field',
+                parentLayerParameterName=self.INPUT_STRUCTURE,
+                type=QgsProcessingParameterField.Any,
+                defaultValue='DIPDIR',
+                optional=True
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterEnum(
+                'ORIENTATION_TYPE',
+                'Orientation Type',
+                options=['Dip Direction', 'Strike'],
+                defaultValue=0
             )
         )
 
@@ -135,39 +208,6 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 "Contacts Layer",
                 [QgsProcessing.TypeVectorLine],
                 optional=True,
-            )
-        )
-
-        self.addParameter(
-            QgsProcessingParameterField(
-                'MIN_AGE_FIELD',
-                'Minimum Age Field',
-                parentLayerParameterName=self.INPUT_GEOLOGY,
-                type=QgsProcessingParameterField.String,
-                defaultValue='MIN_AGE',
-                optional=True
-            )
-        )
-    
-        self.addParameter(
-            QgsProcessingParameterField(
-                'MAX_AGE_FIELD',
-                'Maximum Age Field',
-                parentLayerParameterName=self.INPUT_GEOLOGY,
-                type=QgsProcessingParameterField.String,
-                defaultValue='MAX_AGE',
-                optional=True
-            )
-        )
-        
-        self.addParameter(
-            QgsProcessingParameterField(
-                'GROUP_FIELD',
-                'Group Field',
-                parentLayerParameterName=self.INPUT_GEOLOGY,
-                type=QgsProcessingParameterField.String,
-                defaultValue='GROUP',
-                optional=True
             )
         )
         
@@ -236,6 +276,27 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
             relationships_df = relationships_df.drop(columns=['length'])
         if 'geometry' in contacts_df.columns:
             relationships_df = relationships_df.drop(columns=['geometry'])
+
+        unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
+        if unit_name_field != 'UNITNAME' and unit_name_field in geology_gdf.columns:
+            geology_gdf = geology_gdf.rename(columns={unit_name_field: 'UNITNAME'})
+        
+        dip_field = parameters.get('DIP_FIELD', 'DIP') if parameters else 'DIP'
+        if dip_field != 'DIP' and dip_field in structure_gdf.columns:
+            structure_gdf = structure_gdf.rename(columns={dip_field: 'DIP'})
+
+        orientation_type = self.parameterAsEnum(parameters, 'ORIENTATION_TYPE', context)
+        orientation_type_name = ['Dip Direction', 'Strike'][orientation_type]
+        dipdir_field = parameters.get('DIPDIR_FIELD', 'DIPDIR') if parameters else 'DIPDIR'
+        if dipdir_field in structure_gdf.columns:
+            if orientation_type_name == 'Strike':
+                structure_gdf['DIPDIR'] = structure_gdf[dipdir_field].apply(
+                    lambda val: (val + 90.0) % 360.0 if pd.notnull(val) else val
+                )
+            else:
+                structure_gdf = structure_gdf.rename(columns={dipdir_field: 'DIPDIR'})
+
+
         order = sorter.sort(
             units_df,
             relationships_df,
