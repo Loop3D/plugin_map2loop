@@ -72,7 +72,8 @@ class TestBasalContacts(unittest.TestCase):
             'FAULTS': faults_layer,
             'STRATIGRAPHIC_COLUMN': strati_column,
             'IGNORE_UNITS': [],
-            'BASAL_CONTACTS': 'memory:basal_contacts'
+            'BASAL_CONTACTS': 'memory:basal_contacts',
+            'ALL_CONTACTS': 'memory:all_contacts'
         }
         
         context = QgsProcessingContext()
