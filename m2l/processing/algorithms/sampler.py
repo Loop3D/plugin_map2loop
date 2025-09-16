@@ -154,11 +154,8 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         if spatial_data is None:
             raise QgsProcessingException("Spatial data is required")
         
-        if sampler_type is "Decimator":
-            if geology is None:
-                raise QgsProcessingException("Geology is required")
-            if dtm is None:
-                raise QgsProcessingException("DTM is required")
+        if sampler_type == "Decimator" and geology is None:
+            raise QgsProcessingException("Geology is required")
         
         # Convert geology layers to GeoDataFrames
         geology = qgsLayerToGeoDataFrame(geology)
