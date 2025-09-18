@@ -263,19 +263,13 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         #
         # NB: map2loop does *not* need geometries – only attribute values.
         # --------------------------------------------------
-        units_df= build_input_frames(in_layer, feedback,parameters)
+        units_df, relationships_df, contacts_df= build_input_frames(in_layer,contacts_layer, feedback,parameters)
 
         # 3 ► run the sorter
         sorter = sorter_cls()                     # instantiation is always zero-argument
         geology_gdf = qgsLayerToGeoDataFrame(in_layer)
         structure_gdf = qgsLayerToGeoDataFrame(structure)
         dtm_gdal = gdal.Open(dtm.source()) if dtm is not None and dtm.isValid() else None
-        contacts_df = qgsLayerToGeoDataFrame(contacts_layer)
-        relationships_df = contacts_df.copy()
-        if 'length' in contacts_df.columns:
-            relationships_df = relationships_df.drop(columns=['length'])
-        if 'geometry' in contacts_df.columns:
-            relationships_df = relationships_df.drop(columns=['geometry'])
 
         unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
         if unit_name_field != 'UNITNAME' and unit_name_field in geology_gdf.columns:
@@ -335,14 +329,14 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 # -------------------------------------------------------------------------
 #  Helper stub – you must replace with *your* conversion logic
 # -------------------------------------------------------------------------
-def build_input_frames(layer: QgsVectorLayer, feedback, parameters) -> pd.DataFrame:
+def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, feedback, parameters) -> tuple:
     """
     Placeholder that turns the geology layer (and any other project
     layers) into the four objects required by the sorter.
 
     Returns
     -------
-    units_df
+    (units_df, relationships_df, contacts_df)
     """
 
     unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
@@ -374,4 +368,16 @@ def build_input_frames(layer: QgsVectorLayer, feedback, parameters) -> pd.DataFr
 
     feedback.pushInfo(f"Units → {unique_num_of_units}  records")
 
-    return units_df
+    contacts_df = qgsLayerToGeoDataFrame(contacts_layer) if contacts_layer else pd.DataFrame()
+    if not contacts_df.empty:
+        relationships_df = contacts_df.copy()
+        if 'length' in contacts_df.columns:
+            relationships_df = relationships_df.drop(columns=['length'])
+        if 'geometry' in contacts_df.columns:
+            relationships_df = relationships_df.drop(columns=['geometry'])
+        feedback.pushInfo(f"Contacts → {len(contacts_df)} records")
+        feedback.pushInfo(f"Relationships → {len(relationships_df)} records")
+    else:
+        relationships_df = pd.DataFrame()
+
+    return units_df, relationships_df, contacts_df
