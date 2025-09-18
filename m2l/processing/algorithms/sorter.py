@@ -364,8 +364,14 @@ def build_input_frames(layer: QgsVectorLayer, feedback, parameters) -> pd.DataFr
         )
     units_df = pd.DataFrame.from_records(units_records)
 
+    total_num_of_units = len(units_df)
+    units_df = units_df.drop_duplicates(subset=['name'])
+    unique_num_of_units = len(units_df)
+
+    feedback.pushInfo(f"Removed duplicated units: {total_num_of_units - unique_num_of_units}")
+
     # map_data can be mocked if you only use Age-based sorter
 
-    feedback.pushInfo(f"Units → {len(units_df)} records")
+    feedback.pushInfo(f"Units → {unique_num_of_units}  records")
 
     return units_df
