@@ -21,8 +21,10 @@ from qgis.core import (
     QgsProcessingParameterFeatureSource,
     QgsProcessingParameterField,
     QgsProcessingParameterRasterLayer,
+    QgsProcessingParameterMatrix,
     QgsVectorLayer,
-    QgsWkbTypes
+    QgsWkbTypes,
+    QgsSettings
 )
 
 # ────────────────────────────────────────────────
@@ -113,11 +115,25 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 defaultValue=0
             )
         )
+        strati_settings = QgsSettings()
+        last_strati_column = strati_settings.value("m2l/sorter_strati_column", "")
+        
+        self.addParameter(
+            QgsProcessingParameterMatrix(
+                name=self.INPUT_STRATI_COLUMN,
+                description="Stratigraphic Order",
+                headers=["layerId", "name", "minAge", "maxAge", "group"],
+                numberRows=0,
+                defaultValue=last_strati_column
+            )
+        )
+
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT_GEOLOGY,
                 "Geology polygons",
                 [QgsProcessing.TypeVectorPolygon],
+                optional=True
             )
         )
 
@@ -199,7 +215,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterEnum(
                 'ORIENTATION_TYPE',
                 'Orientation Type',
-                options=['Dip Direction', 'Strike'],
+                options=['','Dip Direction', 'Strike'],
                 defaultValue=0
             )
         )
@@ -217,7 +233,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 "CONTACTS_LAYER",
                 "Contacts Layer",
                 [QgsProcessing.TypeVectorLine],
-                optional=True,
+                optional=False,
             )
         )
         
@@ -249,69 +265,64 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         feedback: QgsProcessingFeedback,
     ) -> dict[str, Any]:
 
-        # 1 ► fetch user selections
-        in_layer: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
-        contacts_layer: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.CONTACTS_LAYER, context)
         method = self.parameterAsEnum(parameters, self.METHOD, context)
-        algo_index: int          = self.parameterAsEnum(parameters, self.SORTING_ALGORITHM, context)
-        sorter_cls               = list(SORTER_LIST.values())[algo_index]
-        is_observation_projections = (method == 1) and (sorter_cls == SorterObservationProjections)
+        algo_index: int = self.parameterAsEnum(parameters, self.SORTING_ALGORITHM, context)
+        sorter_cls = list(SORTER_LIST.values())[algo_index]
+        contacts_layer = self.parameterAsVectorLayer(parameters, self.CONTACTS_LAYER, context)
+        in_layer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
 
-        feedback.pushInfo(f"Using sorter: {sorter_cls.__name__}")
-
-        # 2 ► convert QGIS layers / tables to pandas
-        # --------------------------------------------------
-        # You must supply these three DataFrames:
-        #   units_df           — required         (layerId, name, minAge, maxAge, group)
-        #   relationships_df   — required         (Index1 / Unitname1, Index2 / Unitname2 …)
-        #   contacts_df        — required for all but Age‐based
-        #
-        # Typical workflow:
-        #   • iterate over in_layer.getFeatures()
-        #   • build dicts/lists
-        #   • pd.DataFrame(…)
-        #
-        # NB: map2loop does *not* need geometries – only attribute values.
-        # --------------------------------------------------
-
-        structure = None
-        dtm = None
-        if is_observation_projections:
-            structure = self.parameterAsVectorLayer(parameters, self.INPUT_STRUCTURE, context)
-            dtm = self.parameterAsRasterLayer(parameters, self.INPUT_DTM, context)
-            if not structure or not structure.isValid() or not dtm or not dtm.isValid():
-                raise QgsProcessingException("Structure and DTM layer are required for observation projections")
+        if method == 0: # User-Defined
+            strati_column_matrix = self.parameterAsMatrix(parameters, self.INPUT_STRATI_COLUMN, context)
+            strati_column_settings = QgsSettings()
+            strati_column_settings.setValue('m2l/strati_column', strati_column_matrix)
+            if not strati_column_matrix or len(strati_column_matrix) == 0 or not strati_column_matrix[0]:
+                raise QgsProcessingException("No stratigraphic column provided")
+            
+            
+            units_df, relationships_df, contacts_df= build_input_frames(None,contacts_layer, feedback,parameters, strati_column_matrix)
+            
         else:
+            units_df, relationships_df, contacts_df= build_input_frames(in_layer,contacts_layer, feedback,parameters)
+
+        if sorter_cls == SorterObservationProjections:
+            geology_gdf = qgsLayerToGeoDataFrame(in_layer)
             structure = self.parameterAsVectorLayer(parameters, self.INPUT_STRUCTURE, context)
             dtm = self.parameterAsRasterLayer(parameters, self.INPUT_DTM, context)
+            if geology_gdf is None or geology_gdf.empty or not structure or not structure.isValid() or not dtm or not dtm.isValid():
+                raise QgsProcessingException("Structure and DTM layer are required for observation projections")
 
-        units_df, relationships_df, contacts_df= build_input_frames(in_layer,contacts_layer, feedback,parameters)
+            structure_gdf = qgsLayerToGeoDataFrame(structure) if structure else None
+            dtm_gdal = gdal.Open(dtm.source()) if dtm is not None and dtm.isValid() else None
 
-        # 3 ► run the sorter
-        sorter = sorter_cls()                     # instantiation is always zero-argument
-        geology_gdf = qgsLayerToGeoDataFrame(in_layer)
-        structure_gdf = qgsLayerToGeoDataFrame(structure) if structure else None
-        dtm_gdal = gdal.Open(dtm.source()) if dtm is not None and dtm.isValid() else None
+            unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
+            if unit_name_field != 'UNITNAME' and unit_name_field in geology_gdf.columns:
+                geology_gdf = geology_gdf.rename(columns={unit_name_field: 'UNITNAME'})
 
-        unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
-        if unit_name_field != 'UNITNAME' and unit_name_field in geology_gdf.columns:
-            geology_gdf = geology_gdf.rename(columns={unit_name_field: 'UNITNAME'})
-        
-        if structure_gdf:
             dip_field = parameters.get('DIP_FIELD', 'DIP') if parameters else 'DIP'
+            if not dip_field:
+                raise QgsProcessingException("Dip Field is required")
             if dip_field != 'DIP' and dip_field in structure_gdf.columns:
                 structure_gdf = structure_gdf.rename(columns={dip_field: 'DIP'})
             orientation_type = self.parameterAsEnum(parameters, 'ORIENTATION_TYPE', context)
-            orientation_type_name = ['Dip Direction', 'Strike'][orientation_type]
+            orientation_type_name = ['','Dip Direction', 'Strike'][orientation_type]
+            if not orientation_type_name:
+                raise QgsProcessingException("Orientation Type is required")
             dipdir_field = parameters.get('DIPDIR_FIELD', 'DIPDIR') if parameters else 'DIPDIR'
+            if not dipdir_field:
+                raise QgsProcessingException("Dip Direction Field is required")
             if dipdir_field in structure_gdf.columns:
                 if orientation_type_name == 'Strike':
                     structure_gdf['DIPDIR'] = structure_gdf[dipdir_field].apply(
                         lambda val: (val + 90.0) % 360.0 if pd.notnull(val) else val
                     )
-                else:
+                elif orientation_type_name == 'Dip Direction':
                     structure_gdf = structure_gdf.rename(columns={dipdir_field: 'DIPDIR'})
+        else:
+            geology_gdf = None
+            structure_gdf = None
+            dtm_gdal = None
 
+        sorter = sorter_cls()
         order = sorter.sort(
             units_df,
             relationships_df,
@@ -332,7 +343,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
             context,
             sink_fields,
             QgsWkbTypes.NoGeometry,
-            in_layer.sourceCrs(),
+            in_layer.sourceCrs() if in_layer else None,
         )
 
         for pos, name in enumerate(order, start=1):
@@ -350,7 +361,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 # -------------------------------------------------------------------------
 #  Helper stub – you must replace with *your* conversion logic
 # -------------------------------------------------------------------------
-def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, feedback, parameters) -> tuple:
+def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, feedback, parameters, user_defined_units=None) -> tuple:
     """
     Placeholder that turns the geology layer (and any other project
     layers) into the four objects required by the sorter.
@@ -360,34 +371,54 @@ def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, fee
     (units_df, relationships_df, contacts_df)
     """
 
-    unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
-    min_age_field = parameters.get('MIN_AGE_FIELD', 'MIN_AGE') if parameters else 'MIN_AGE'
-    max_age_field = parameters.get('MAX_AGE_FIELD', 'MAX_AGE') if parameters else 'MAX_AGE'
-    group_field = parameters.get('GROUP_FIELD', 'GROUP') if parameters else 'GROUP'
-
-    # Example: convert the geology layer to a very small units_df
-    units_records = []
-    for f in layer.getFeatures():
-        units_records.append(
-            dict(
-                layerId=f.id(),
-                name=f[unit_name_field],           # attribute names → your schema
-                minAge=float(f[min_age_field]),
-                maxAge=float(f[max_age_field]),
-                group=f[group_field],
+    if user_defined_units:
+        units_record = []
+        for i, row in enumerate(user_defined_units):
+            units_record.append(
+                dict(
+                    layerId=i,
+                    name=row[1],
+                    minAge=row[2],
+                    maxAge=row[3],
+                    group=row[4]
+                    )
             )
-        )
-    units_df = pd.DataFrame.from_records(units_records)
+        units_df = pd.DataFrame.from_records(units_record)
+    else:
+        unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
+        min_age_field = parameters.get('MIN_AGE_FIELD', 'MIN_AGE') if parameters else 'MIN_AGE'
+        max_age_field = parameters.get('MAX_AGE_FIELD', 'MAX_AGE') if parameters else 'MAX_AGE'
+        group_field = parameters.get('GROUP_FIELD', 'GROUP') if parameters else 'GROUP'
 
-    total_num_of_units = len(units_df)
-    units_df = units_df.drop_duplicates(subset=['name'])
-    unique_num_of_units = len(units_df)
+        if not layer or not layer.isValid():
+            raise QgsProcessingException("No geology layer provided")
+        if not unit_name_field:
+            raise QgsProcessingException("Unit Name Field is required")
+        if not min_age_field:
+            raise QgsProcessingException("Minimum Age Field is required")
+        if not max_age_field:
+            raise QgsProcessingException("Maximum Age Field is required")
+        if not group_field:
+            raise QgsProcessingException("Group Field is required")
 
-    feedback.pushInfo(f"Removed duplicated units: {total_num_of_units - unique_num_of_units}")
+        units_records = []
+        for f in layer.getFeatures():
+            units_records.append(
+                dict(
+                    layerId=f.id(),
+                    name=f[unit_name_field],           # attribute names → your schema
+                    minAge=float(f[min_age_field]),
+                    maxAge=float(f[max_age_field]),
+                    group=f[group_field],
+                )
+            )
+        units_df = pd.DataFrame.from_records(units_records)
 
+    feedback.pushInfo(f"Units → {len(units_df)}  records")
     # map_data can be mocked if you only use Age-based sorter
 
-    feedback.pushInfo(f"Units → {unique_num_of_units}  records")
+    if not contacts_layer or not contacts_layer.isValid():
+        raise QgsProcessingException("No contacts layer provided")
 
     contacts_df = qgsLayerToGeoDataFrame(contacts_layer) if contacts_layer else pd.DataFrame()
     if not contacts_df.empty:
