@@ -1,6 +1,7 @@
 from typing import Any, Optional
 from osgeo import gdal
 import pandas as pd
+import json
 
 from PyQt5.QtCore import QMetaType
 from qgis import processing
@@ -17,6 +18,7 @@ from qgis.core import (
     QgsProcessingException,
     QgsProcessingFeedback,
     QgsProcessingParameterEnum,
+    QgsProcessingParameterFileDestination,
     QgsProcessingParameterFeatureSink,
     QgsProcessingParameterFeatureSource,
     QgsProcessingParameterField,
@@ -255,6 +257,14 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
+        self.addParameter(
+            QgsProcessingParameterFileDestination(
+                "JSON_OUTPUT",
+                "Stratigraphic column json",
+                fileFilter="JSON files (*.json)"
+            )
+        )
+
     # ----------------------------------------------------------
     #  Core
     # ----------------------------------------------------------
@@ -270,6 +280,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         sorter_cls = list(SORTER_LIST.values())[algo_index]
         contacts_layer = self.parameterAsVectorLayer(parameters, self.CONTACTS_LAYER, context)
         in_layer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
+        output_file = self.parameterAsFileOutput(parameters, 'JSON_OUTPUT', context)
 
         if method == 0: # User-Defined
             strati_column_matrix = self.parameterAsMatrix(parameters, self.INPUT_STRATI_COLUMN, context)
@@ -317,20 +328,20 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                     )
                 elif orientation_type_name == 'Dip Direction':
                     structure_gdf = structure_gdf.rename(columns={dipdir_field: 'DIPDIR'})
+            order = sorter_cls().sort(
+                units_df,
+                relationships_df,
+                contacts_df,
+                geology_gdf,
+                structure_gdf,
+                dtm_gdal
+            )
         else:
-            geology_gdf = None
-            structure_gdf = None
-            dtm_gdal = None
-
-        sorter = sorter_cls()
-        order = sorter.sort(
-            units_df,
-            relationships_df,
-            contacts_df,
-            geology_gdf,
-            structure_gdf,
-            dtm_gdal
-        )
+            order = sorter_cls().sort(
+                units_df,
+                relationships_df,
+                contacts_df
+            )
 
         # 4 ► write an in-memory table with the result
         sink_fields = QgsFields()
@@ -350,8 +361,14 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
             f = QgsFeature(sink_fields)
             f.setAttributes([pos, name])
             sink.addFeature(f, QgsFeatureSink.FastInsert)
+        try:
+            with open(output_file, 'w') as f:
+                json.dump(order, f)
+        except Exception as e:
+            with open(output_file, 'w') as f:
+                json.dump([], f)
 
-        return {self.OUTPUT: dest_id}
+        return {self.OUTPUT: dest_id, 'JSON_OUTPUT': output_file}
 
     # ----------------------------------------------------------
     def createInstance(self) -> QgsProcessingAlgorithm:
