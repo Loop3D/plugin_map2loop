@@ -79,6 +79,8 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
     
     def updateParameters(self, parameters):
         selected_method = parameters.get(self.METHOD, 0)
+        selected_algorithm = parameters.get(self.SORTING_ALGORITHM, 0)
+
         if selected_method == 0:  # User-Defined selected
             self.parameterDefinition(self.INPUT_STRATI_COLUMN).setMetadata({'widget_wrapper': {'visible': True}})
             self.parameterDefinition(self.SORTING_ALGORITHM).setMetadata({'widget_wrapper': {'visible': False}})
@@ -88,6 +90,14 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
             self.parameterDefinition(self.SORTING_ALGORITHM).setMetadata({'widget_wrapper': {'visible': True}})
             self.parameterDefinition(self.INPUT_STRATI_COLUMN).setMetadata({'widget_wrapper': {'visible': False}})
             
+            # observation projects
+            is_observation_projections = selected_algorithm == 5
+            self.parameterDefinition(self.INPUT_STRUCTURE).setMetadata({'widget_wrapper': {'visible': is_observation_projections}})
+            self.parameterDefinition(self.INPUT_DTM).setMetadata({'widget_wrapper': {'visible': is_observation_projections}})
+            self.parameterDefinition('DIP_FIELD').setMetadata({'widget_wrapper': {'visible': is_observation_projections}})
+            self.parameterDefinition('DIPDIR_FIELD').setMetadata({'widget_wrapper': {'visible': is_observation_projections}})
+            self.parameterDefinition('ORIENTATION_TYPE').setMetadata({'widget_wrapper': {'visible': is_observation_projections}})
+                
         return super().updateParameters(parameters)
 
     # ----------------------------------------------------------
@@ -241,11 +251,11 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 
         # 1 ► fetch user selections
         in_layer: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
-        structure: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.INPUT_STRUCTURE, context)
-        dtm: QgsRasterLayer = self.parameterAsRasterLayer(parameters, self.INPUT_DTM, context)
         contacts_layer: QgsVectorLayer = self.parameterAsVectorLayer(parameters, self.CONTACTS_LAYER, context)
+        method = self.parameterAsEnum(parameters, self.METHOD, context)
         algo_index: int          = self.parameterAsEnum(parameters, self.SORTING_ALGORITHM, context)
         sorter_cls               = list(SORTER_LIST.values())[algo_index]
+        is_observation_projections = (method == 1) and (sorter_cls == SorterObservationProjections)
 
         feedback.pushInfo(f"Using sorter: {sorter_cls.__name__}")
 
@@ -263,33 +273,44 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         #
         # NB: map2loop does *not* need geometries – only attribute values.
         # --------------------------------------------------
+
+        structure = None
+        dtm = None
+        if is_observation_projections:
+            structure = self.parameterAsVectorLayer(parameters, self.INPUT_STRUCTURE, context)
+            dtm = self.parameterAsRasterLayer(parameters, self.INPUT_DTM, context)
+            if not structure or not structure.isValid() or not dtm or not dtm.isValid():
+                raise QgsProcessingException("Structure and DTM layer are required for observation projections")
+        else:
+            structure = self.parameterAsVectorLayer(parameters, self.INPUT_STRUCTURE, context)
+            dtm = self.parameterAsRasterLayer(parameters, self.INPUT_DTM, context)
+
         units_df, relationships_df, contacts_df= build_input_frames(in_layer,contacts_layer, feedback,parameters)
 
         # 3 ► run the sorter
         sorter = sorter_cls()                     # instantiation is always zero-argument
         geology_gdf = qgsLayerToGeoDataFrame(in_layer)
-        structure_gdf = qgsLayerToGeoDataFrame(structure)
+        structure_gdf = qgsLayerToGeoDataFrame(structure) if structure else None
         dtm_gdal = gdal.Open(dtm.source()) if dtm is not None and dtm.isValid() else None
 
         unit_name_field = parameters.get('UNIT_NAME_FIELD', 'UNITNAME') if parameters else 'UNITNAME'
         if unit_name_field != 'UNITNAME' and unit_name_field in geology_gdf.columns:
             geology_gdf = geology_gdf.rename(columns={unit_name_field: 'UNITNAME'})
         
-        dip_field = parameters.get('DIP_FIELD', 'DIP') if parameters else 'DIP'
-        if dip_field != 'DIP' and dip_field in structure_gdf.columns:
-            structure_gdf = structure_gdf.rename(columns={dip_field: 'DIP'})
-
-        orientation_type = self.parameterAsEnum(parameters, 'ORIENTATION_TYPE', context)
-        orientation_type_name = ['Dip Direction', 'Strike'][orientation_type]
-        dipdir_field = parameters.get('DIPDIR_FIELD', 'DIPDIR') if parameters else 'DIPDIR'
-        if dipdir_field in structure_gdf.columns:
-            if orientation_type_name == 'Strike':
-                structure_gdf['DIPDIR'] = structure_gdf[dipdir_field].apply(
-                    lambda val: (val + 90.0) % 360.0 if pd.notnull(val) else val
-                )
-            else:
-                structure_gdf = structure_gdf.rename(columns={dipdir_field: 'DIPDIR'})
-
+        if structure_gdf:
+            dip_field = parameters.get('DIP_FIELD', 'DIP') if parameters else 'DIP'
+            if dip_field != 'DIP' and dip_field in structure_gdf.columns:
+                structure_gdf = structure_gdf.rename(columns={dip_field: 'DIP'})
+            orientation_type = self.parameterAsEnum(parameters, 'ORIENTATION_TYPE', context)
+            orientation_type_name = ['Dip Direction', 'Strike'][orientation_type]
+            dipdir_field = parameters.get('DIPDIR_FIELD', 'DIPDIR') if parameters else 'DIPDIR'
+            if dipdir_field in structure_gdf.columns:
+                if orientation_type_name == 'Strike':
+                    structure_gdf['DIPDIR'] = structure_gdf[dipdir_field].apply(
+                        lambda val: (val + 90.0) % 360.0 if pd.notnull(val) else val
+                    )
+                else:
+                    structure_gdf = structure_gdf.rename(columns={dipdir_field: 'DIPDIR'})
 
         order = sorter.sort(
             units_df,
