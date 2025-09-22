@@ -10,7 +10,7 @@
 """
 # Python imports
 from typing import Any, Optional
-from qgis.PyQt.QtCore import QVariant
+from qgis.PyQt.QtCore import QMetaType
 from osgeo import gdal
 import pandas as pd
 
@@ -154,8 +154,11 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         if spatial_data is None:
             raise QgsProcessingException("Spatial data is required")
         
-        if sampler_type == "Decimator" and geology is None:
-            raise QgsProcessingException("Geology is required")
+        if sampler_type == "Decimator":
+            if geology is None:
+                raise QgsProcessingException("Geology is required")
+            if dtm is None:
+                raise QgsProcessingException("DTM is required")
         
         # Convert geology layers to GeoDataFrames
         geology = qgsLayerToGeoDataFrame(geology)
@@ -173,11 +176,11 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             samples = sampler.sample(spatial_data_gdf)
         
         fields = QgsFields()
-        fields.append(QgsField("ID", QVariant.String))
-        fields.append(QgsField("X", QVariant.Double))
-        fields.append(QgsField("Y", QVariant.Double))
-        fields.append(QgsField("Z", QVariant.Double))
-        fields.append(QgsField("featureId", QVariant.String))
+        fields.append(QgsField("ID", QMetaType.Type.QString))
+        fields.append(QgsField("X", QMetaType.Type.Float))
+        fields.append(QgsField("Y", QMetaType.Type.Float))
+        fields.append(QgsField("Z", QMetaType.Type.Float))
+        fields.append(QgsField("featureId", QMetaType.Type.QString))
 
         crs = None
         if spatial_data_gdf is not None and spatial_data_gdf.crs is not None:
