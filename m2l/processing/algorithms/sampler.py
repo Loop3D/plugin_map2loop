@@ -26,12 +26,18 @@ from qgis.core import (
     QgsProcessingParameterFeatureSource,
     QgsProcessingParameterRasterLayer,
     QgsProcessingParameterEnum,
+    QgsProcessingParameterRasterLayer,
+    QgsProcessingParameterEnum,
     QgsProcessingParameterNumber,
+    QgsFields,
     QgsFields,
     QgsField,
     QgsFeature,
     QgsGeometry,
     QgsPointXY,
+    QgsVectorLayer,
+    QgsWkbTypes,
+    QgsCoordinateReferenceSystem
     QgsVectorLayer,
     QgsWkbTypes,
     QgsCoordinateReferenceSystem
@@ -75,8 +81,11 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         
         self.addParameter(
             QgsProcessingParameterEnum(
+            QgsProcessingParameterEnum(
                 self.INPUT_SAMPLER_TYPE,
                 "SAMPLER_TYPE",
+                ["Decimator", "Spacing"],
+                defaultValue=0
                 ["Decimator", "Spacing"],
                 defaultValue=0
             )
@@ -84,9 +93,11 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         
         self.addParameter(
             QgsProcessingParameterRasterLayer(
+            QgsProcessingParameterRasterLayer(
                 self.INPUT_DTM,
                 "DTM",
                 [QgsProcessing.TypeRaster],
+                optional=True,
                 optional=True,
             )
         )
@@ -115,6 +126,8 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
                 "DECIMATION",
                 QgsProcessingParameterNumber.Integer,
                 defaultValue=1,
+                QgsProcessingParameterNumber.Integer,
+                defaultValue=1,
                 optional=True,
             )
         )
@@ -125,6 +138,8 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
                 "SPACING",
                 QgsProcessingParameterNumber.Double,
                 defaultValue=200.0,
+                QgsProcessingParameterNumber.Double,
+                defaultValue=200.0,
                 optional=True,
             )
         )
@@ -132,6 +147,7 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
+                "Sampled Points",
                 "Sampled Points",
             )
         )
@@ -161,12 +177,18 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
         geology = qgsLayerToGeoDataFrame(geology)
         spatial_data_gdf = qgsLayerToGeoDataFrame(spatial_data)
         dtm_gdal = gdal.Open(dtm.source()) if dtm is not None and dtm.isValid() else None
+        spatial_data_gdf = qgsLayerToGeoDataFrame(spatial_data)
+        dtm_gdal = gdal.Open(dtm.source()) if dtm is not None and dtm.isValid() else None
         
+        if sampler_type == "Decimator":
         if sampler_type == "Decimator":
             feedback.pushInfo("Sampling...")
             sampler = SamplerDecimator(decimation=decimation, dtm_data=dtm_gdal, geology_data=geology)
             samples = sampler.sample(spatial_data_gdf)
+            sampler = SamplerDecimator(decimation=decimation, dtm_data=dtm_gdal, geology_data=geology)
+            samples = sampler.sample(spatial_data_gdf)
             
+        if sampler_type == "Spacing":
         if sampler_type == "Spacing":
             feedback.pushInfo("Sampling...")
             sampler = SamplerSpacing(spacing=spacing, dtm_data=dtm_gdal, geology_data=geology)
@@ -187,6 +209,33 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             parameters,
             self.OUTPUT,
             context,
+            fields,
+            QgsWkbTypes.PointZ if 'Z' in (samples.columns if samples is not None else []) else QgsWkbTypes.Point,
+            crs
+        )
+
+        if samples is not None and not samples.empty:
+            for _index, row in samples.iterrows():
+                feature = QgsFeature(fields)
+                
+                # decimator has z values
+                if 'Z' in samples.columns and pd.notna(row.get('Z')):
+                    wkt = f"POINT Z ({row['X']} {row['Y']} {row['Z']})"
+                    feature.setGeometry(QgsGeometry.fromWkt(wkt))
+                else:
+                    #spacing has no z values
+                    feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(row['X'], row['Y'])))
+                
+                feature.setAttributes([
+                    str(row.get('ID', '')),
+                    float(row.get('X', 0)),
+                    float(row.get('Y', 0)),
+                    float(row.get('Z', 0)) if pd.notna(row.get('Z')) else 0.0,
+                    str(row.get('featureId', ''))
+                ])
+                
+                sink.addFeature(feature)
+
             fields,
             QgsWkbTypes.PointZ if 'Z' in (samples.columns if samples is not None else []) else QgsWkbTypes.Point,
             crs

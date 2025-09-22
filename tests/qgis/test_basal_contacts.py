@@ -72,7 +72,8 @@ class TestBasalContacts(unittest.TestCase):
             'FAULTS': faults_layer,
             'STRATIGRAPHIC_COLUMN': strati_column,
             'IGNORE_UNITS': [],
-            'BASAL_CONTACTS': 'memory:basal_contacts'
+            'BASAL_CONTACTS': 'memory:basal_contacts',
+            'ALL_CONTACTS': 'memory:all_contacts'
         }
         
         context = QgsProcessingContext()
@@ -87,6 +88,7 @@ class TestBasalContacts(unittest.TestCase):
             
             self.assertIsNotNone(result, "result should not be None")
             self.assertIn('BASAL_CONTACTS', result, "Result should contain BASAL_CONTACTS key")
+            self.assertIn('ALL_CONTACTS', result, "Result should contain ALL_CONTACTS key")
             
             basal_contacts_layer = context.takeResultLayer(result['BASAL_CONTACTS'])
             self.assertIsNotNone(basal_contacts_layer, "basal contacts layer should not be None")
@@ -95,6 +97,14 @@ class TestBasalContacts(unittest.TestCase):
             
             QgsMessageLog.logMessage(f"Generated {basal_contacts_layer.featureCount()} basal contacts", 
                                      "TestBasalContacts", Qgis.Critical)
+            
+            all_contacts_layer = context.takeResultLayer(result['ALL_CONTACTS'])
+            self.assertIsNotNone(all_contacts_layer, "all contacts layer should not be None")
+            self.assertTrue(all_contacts_layer.isValid(), "all contacts layer should be valid")
+            self.assertGreater(all_contacts_layer.featureCount(), 0, "all contacts layer should have features")
+
+            QgsMessageLog.logMessage(f"Generated {all_contacts_layer.featureCount()} total contacts", 
+                                    "TestBasalContacts", Qgis.Critical)
             
             QgsMessageLog.logMessage("Basal contacts test completed successfully!", "TestBasalContacts", Qgis.Critical)
             
@@ -110,7 +120,11 @@ class TestBasalContacts(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        QgsApplication.processingRegistry().removeProvider(cls.provider)
+        try:
+            registry = QgsApplication.processingRegistry()
+            registry.removeProvider(cls.provider)
+        except Exception:
+            pass
 
 if __name__ == '__main__':
     unittest.main()
