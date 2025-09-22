@@ -88,6 +88,7 @@ class TestSamplerDecimator(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         # QgsApplication.processingRegistry().removeProvider(cls.provider)
+        pass
 
 if __name__ == '__main__':
     unittest.main()
