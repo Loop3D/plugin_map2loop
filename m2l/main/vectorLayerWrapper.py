@@ -454,3 +454,35 @@ def dataframeToQgsLayer(
     feedback.pushInfo("Done.")
     feedback.setProgress(100)
     return sink, sink_id
+
+from qgis.core import NULL
+from PyQt5.QtCore import QVariant
+
+def qvariantToFloat(f, field_name):
+    val = f.attribute(field_name)  # usually returns a native Python type
+    # null / empty values
+    if val in (None, NULL, ''):
+        return None
+    # strings with decimal comma (depending on locale)
+    if isinstance(val, str):
+        val = val.strip()
+        if val == '':
+            return None
+        val = val.replace(',', '.')  # replace comma with dot if present
+        try:
+            return float(val)
+        except ValueError:
+            pass
+    # residual QVariant
+    if isinstance(val, QVariant):
+        # toDouble() -> (value, ok)
+        d, ok = val.toDouble()
+        return float(d) if ok else None
+    # native int/float
+    if isinstance(val, (int, float)):
+        return float(val)
+    # fallback conversion attempt
+    try:
+        return float(val)
+    except Exception:
+        return None
