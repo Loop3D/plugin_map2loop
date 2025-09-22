@@ -37,7 +37,7 @@ from qgis.core import (
     QgsPointXY,
     QgsVectorLayer,
     QgsWkbTypes,
-    QgsCoordinateReferenceSystem
+    QgsCoordinateReferenceSystem,
     QgsVectorLayer,
     QgsWkbTypes,
     QgsCoordinateReferenceSystem
