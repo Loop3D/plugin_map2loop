@@ -57,6 +57,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
     INPUT_GEOLOGY = 'GEOLOGY'
     INPUT_UNIT_NAME_FIELD = 'UNIT_NAME_FIELD'
     INPUT_SAMPLED_CONTACTS = 'SAMPLED_CONTACTS'
+    INPUT_STRATIGRAPHIC_COLUMN_LAYER = 'STRATIGRAPHIC_COLUMN_LAYER'
 
     OUTPUT = "THICKNESS"
 
@@ -97,17 +98,6 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
             )
         )
         
-        bbox_settings = QgsSettings()
-        last_bbox = bbox_settings.value("m2l/bounding_box", "")
-        self.addParameter(
-            QgsProcessingParameterMatrix(
-                self.INPUT_BOUNDING_BOX,
-                description="Bounding Box",
-                headers=['minx','miny','maxx','maxy'],
-                numberRows=1,
-                defaultValue=last_bbox
-            )
-        )
         self.addParameter(
             QgsProcessingParameterNumber(
                 self.INPUT_MAX_LINE_LENGTH,
@@ -141,6 +131,15 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
                 defaultValue='Formation'
             )
         )
+
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                'STRATIGRAPHIC_COLUMN_LAYER',
+                'Stratigraphic Column Layer (from sorter)',
+                [QgsProcessing.TypeVector],
+                optional=True
+            )
+        )
         
         strati_settings = QgsSettings()
         last_strati_column = strati_settings.value("m2l/strati_column", "")
@@ -150,7 +149,8 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
                 description="Stratigraphic Order",
                 headers=["Unit"],
                 numberRows=0,
-                defaultValue=last_strati_column
+                defaultValue=last_strati_column,
+                optional=True
             )
         )
         self.addParameter(
@@ -207,17 +207,39 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
         max_line_length = self.parameterAsSource(parameters, self.INPUT_MAX_LINE_LENGTH, context)
         basal_contacts = self.parameterAsSource(parameters, self.INPUT_BASAL_CONTACTS, context)
         geology_data = self.parameterAsSource(parameters, self.INPUT_GEOLOGY, context)
-        stratigraphic_order = self.parameterAsMatrix(parameters, self.INPUT_STRATI_COLUMN, context)
         structure_data = self.parameterAsSource(parameters, self.INPUT_STRUCTURE_DATA, context)
         structure_dipdir_field = self.parameterAsString(parameters, self.INPUT_DIPDIR_FIELD, context)
         structure_dip_field = self.parameterAsString(parameters, self.INPUT_DIP_FIELD, context)
         sampled_contacts = self.parameterAsSource(parameters, self.INPUT_SAMPLED_CONTACTS, context)
         unit_name_field = self.parameterAsString(parameters, self.INPUT_UNIT_NAME_FIELD, context)
 
-        bbox_settings = QgsSettings()
-        bbox_settings.setValue("m2l/bounding_box", bounding_box)
-        strati_column_settings = QgsSettings()
-        strati_column_settings.setValue('m2l/strati_column', stratigraphic_order)
+        geology_layer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
+        extent = geology_layer.extent()
+        bounding_box = {
+            'minx': extent.xMinimum(),
+            'miny': extent.yMinimum(),
+            'maxx': extent.xMaximum(),
+            'maxy': extent.yMaximum()
+        }
+        stratigraphic_column_layer = self.parameterAsVectorLayer(parameters, self.INPUT_STRATIGRAPHIC_COLUMN_LAYER, context)
+        stratigraphic_order = None
+        if stratigraphic_column_layer is not None and stratigraphic_column_layer.isValid():
+            stratigraphic_order=[]
+            stratigraphic_order_df = qgsLayerToDataFrame(stratigraphic_column_layer)
+            stratigraphic_order_df = stratigraphic_order_df.sort_values('order')
+            for _, row in stratigraphic_order_df.iterrows():
+                stratigraphic_order.append(row['unit_name'])
+
+        else:
+            matrix_stratigraphic_order = self.parameterAsMatrix(parameters, self.INPUT_STRATI_COLUMN, context)
+            if matrix_stratigraphic_order:
+                stratigraphic_order = [row[0] for row in matrix_stratigraphic_order if row and len(row) > 0]
+            else:
+                raise QgsProcessingException("Stratigraphic column layer is required")
+        if stratigraphic_order:
+            matrix = [[unit] for unit in stratigraphic_order]
+            strati_column_settings = QgsSettings()
+            strati_column_settings.setValue('m2l/strati_column', matrix)
         # convert layers to dataframe or geodataframe
         units = qgsLayerToDataFrame(geology_data)
         geology_data = qgsLayerToGeoDataFrame(geology_data)
@@ -249,8 +271,6 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
                 structure_data = structure_data.rename(columns=rename_map)
         sampled_contacts = qgsLayerToDataFrame(sampled_contacts)
         dtm_data = qgsRasterToGdalDataset(dtm_data)
-        bounding_box = matrixToDict(bounding_box)
-        feedback.pushInfo("Calculating unit thicknesses...")
         if thickness_type == "InterpolatedStructure":
             thickness_calculator = InterpolatedStructure(
                 dtm_data=dtm_data,
