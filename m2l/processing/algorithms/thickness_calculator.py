@@ -270,6 +270,9 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
             if rename_map:
                 structure_data = structure_data.rename(columns=rename_map)
         sampled_contacts = qgsLayerToDataFrame(sampled_contacts)
+        sampled_contacts['X'] = sampled_contacts['X'].astype(float)
+        sampled_contacts['Y'] = sampled_contacts['Y'].astype(float)
+        sampled_contacts['Z'] = sampled_contacts['Z'].astype(float)
         dtm_data = qgsRasterToGdalDataset(dtm_data)
         if thickness_type == "InterpolatedStructure":
             thickness_calculator = InterpolatedStructure(
