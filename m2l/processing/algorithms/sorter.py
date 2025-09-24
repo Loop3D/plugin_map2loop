@@ -118,8 +118,6 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 defaultValue="Observation projections",                       # Age-based is safest default
             )
         )
-        strati_settings = QgsSettings()
-        last_strati_column = strati_settings.value("m2l/sorter_strati_column", "")
 
         self.addParameter(
             QgsProcessingParameterFeatureSource(

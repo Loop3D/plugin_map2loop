@@ -34,22 +34,27 @@ class TestSamplerDecimator(unittest.TestCase):
         
         self.assertTrue(geology_layer.isValid(), "geology layer should be valid")
         self.assertTrue(structure_layer.isValid(), "structure layer should be valid")
+        self.assertTrue(dtm_layer.isValid(), "dtm layer should be valid")
         self.assertGreater(geology_layer.featureCount(), 0, "geology layer should have features")
         self.assertGreater(structure_layer.featureCount(), 0, "structure layer should have features")
         
         QgsMessageLog.logMessage(f"geology layer valid: {geology_layer.isValid()}", "TestDecimator", Qgis.Critical)
         QgsMessageLog.logMessage(f"structure layer valid: {structure_layer.isValid()}", "TestDecimator", Qgis.Critical)
+        QgsMessageLog.logMessage(f"dtm layer valid: {dtm_layer.isValid()}", "TestDecimator", Qgis.Critical)
+        QgsMessageLog.logMessage(f"dtm source: {dtm_layer.source()}", "TestDecimator", Qgis.Critical)
         
         QgsMessageLog.logMessage(f"geology layer: {geology_layer.featureCount()} features", "TestDecimator", Qgis.Critical)
         QgsMessageLog.logMessage(f"structure layer: {structure_layer.featureCount()} features", "TestDecimator", Qgis.Critical)
         QgsMessageLog.logMessage(f"spatial data- structure layer", "TestDecimator", Qgis.Critical)
         QgsMessageLog.logMessage(f"sampler type: Decimator", "TestDecimator", Qgis.Critical)
         QgsMessageLog.logMessage(f"decimation: 1", "TestDecimator", Qgis.Critical)
+        QgsMessageLog.logMessage(f"dtm: {self.dtm_file.name}", "TestDecimator", Qgis.Critical)
         
         algorithm = SamplerAlgorithm()
         algorithm.initAlgorithm()
 
         parameters = {
+            'DTM': dtm_layer,
             'GEOLOGY': geology_layer,
             'SPATIAL_DATA': structure_layer,
             'SAMPLER_TYPE': 0,
@@ -87,7 +92,11 @@ class TestSamplerDecimator(unittest.TestCase):
     
     @classmethod
     def tearDownClass(cls):
-        QgsApplication.processingRegistry().removeProvider(cls.provider)
+        try:
+            registry = QgsApplication.processingRegistry()
+            registry.removeProvider(cls.provider)
+        except Exception:
+            pass
 
 if __name__ == '__main__':
     unittest.main()

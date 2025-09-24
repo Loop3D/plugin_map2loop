@@ -1,5 +1,5 @@
 # PyQGIS / PyQt imports
-
+from osgeo import gdal
 from qgis.core import (
         QgsRaster,
         QgsFields, 
@@ -12,17 +12,79 @@ from qgis.core import (
         QgsProcessingException,
         QgsPoint,
         QgsPointXY,
+        QgsProject,
+        QgsCoordinateTransform,
+        QgsRasterLayer
     )
 
-from qgis.PyQt.QtCore import QVariant, QDateTime, QVariant
-
+from qgis.PyQt.QtCore import QVariant, QDateTime
+from qgis import processing
 from shapely.geometry import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon
 from shapely.wkb import loads as wkb_loads
 import pandas as pd
 import geopandas as gpd
 import numpy as np
-   
+import tempfile
+import os
 
+def qgsRasterToGdalDataset(rlayer: QgsRasterLayer):
+    """
+    Convert a QgsRasterLayer to an osgeo.gdal.Dataset (read-only).
+    If the raster is non-file-based (e.g. WMS/WCS/virtual), we create a temp GeoTIFF via gdal:translate.
+    Returns a gdal.Dataset or None.
+    """
+    if rlayer is None or not rlayer.isValid():
+        return None
+
+    # Try direct open on file-backed layers
+    candidates = []
+    try:
+        candidates.append(rlayer.source())
+    except Exception:
+        pass
+    try:
+        if rlayer.dataProvider():
+            candidates.append(rlayer.dataProvider().dataSourceUri())
+    except Exception:
+        pass
+
+    tried = set()
+    for uri in candidates:
+        if not uri:
+            continue
+        if uri in tried:
+            continue
+        tried.add(uri)
+
+        # Strip QGIS pipe options: "path.tif|layername=..." → "path.tif"
+        base_uri = uri.split("|")[0]
+
+        # Some providers store “SUBDATASET:” URIs; gdal.OpenEx can usually handle them directly.
+        ds = gdal.OpenEx(base_uri, gdal.OF_RASTER | gdal.OF_READONLY)
+        if ds is not None:
+            return ds
+
+    # If we’re here, it’s likely non-file-backed. Export to a temp GeoTIFF.
+    tmpdir = tempfile.gettempdir()
+    tmp_path = os.path.join(tmpdir, f"m2l_dtm_{rlayer.id()}.tif")
+
+    # Use GDAL Translate via QGIS processing (avoids CRS pitfalls)
+    processing.run(
+        "gdal:translate",
+        {
+            "INPUT": rlayer,   # QGIS accepts the layer object here
+            "TARGET_CRS": None,
+            "NODATA": None,
+            "COPY_SUBDATASETS": False,
+            "OPTIONS": "",
+            "EXTRA": "",
+            "DATA_TYPE": 0,        # Use input data type
+            "OUTPUT": tmp_path,
+        }
+    )
+
+    ds = gdal.OpenEx(tmp_path, gdal.OF_RASTER | gdal.OF_READONLY)
+    return ds
 
 def qgsLayerToGeoDataFrame(layer) -> gpd.GeoDataFrame:
     if layer is None:
@@ -42,63 +104,147 @@ def qgsLayerToGeoDataFrame(layer) -> gpd.GeoDataFrame:
                 data[f.name()].append(str(feature[f.name()]))
             else:
                 data[f.name()].append(feature[f.name()])
-    return gpd.GeoDataFrame(data, crs=layer.crs().authid())
+    return gpd.GeoDataFrame(data, crs=layer.sourceCrs().authid())
 
-def qgsLayerToDataFrame(layer, dtm) -> pd.DataFrame:
-    """Convert a vector layer to a pandas DataFrame
-    samples the geometry using either points or the vertices of the lines
-
-    :param layer: _description_
-    :type layer: _type_
-    :param dtm: Digital Terrain Model to evaluate Z values
-    :type dtm: _type_ or None
-    :return: the dataframe object
-    :rtype: pd.DataFrame
+def qgsLayerToDataFrame(src, dtm=None) -> pd.DataFrame:
     """
-    if layer is None:
+    Convert a vector layer or processing feature source to a pandas DataFrame.
+    Samples geometry using points or vertices of lines/polygons.
+    Optionally samples Z from a DTM raster.
+
+    :param src: QgsVectorLayer or QgsProcessingFeatureSource
+    :param dtm: QgsRasterLayer or None
+    :return: pd.DataFrame with columns: X, Y, Z, and all layer fields
+    """
+
+    if src is None:
         return None
-    fields = layer.fields()
-    data = {}
-    data['X'] = []
-    data['Y'] = []
-    data['Z'] = []
 
-    for field in fields:
-        data[field.name()] = []
-    for feature in layer.getFeatures():
-        geom = feature.geometry()
-        points = []
-        if geom.isMultipart():
-            if geom.type() == QgsWkbTypes.PointGeometry:
-                points = geom.asMultiPoint()
-            elif geom.type() == QgsWkbTypes.LineGeometry:
+    # --- Resolve fields and source CRS (works for both layer and feature source) ---
+    fields = src.fields() if hasattr(src, "fields") else None
+    if fields is None:
+        # Fallback: take fields from first feature if needed
+        feat_iter = src.getFeatures()
+        try:
+            first = next(feat_iter)
+        except StopIteration:
+            return pd.DataFrame(columns=["X", "Y", "Z"])
+        fields = first.fields()
+        # Rewind iterator by building a new one
+        feats = [first] + list(src.getFeatures())
+    else:
+        feats = src.getFeatures()
+
+    # Get source CRS
+    if hasattr(src, "crs"):
+        src_crs = src.crs()
+    elif hasattr(src, "sourceCrs"):
+        src_crs = src.sourceCrs()
+    else:
+        src_crs = None
+
+    # --- Prepare optional transform to DTM CRS for sampling ---
+    to_dtm = None
+    if dtm is not None and src_crs is not None and dtm.crs().isValid() and src_crs.isValid():
+        if src_crs != dtm.crs():
+            to_dtm = QgsCoordinateTransform(src_crs, dtm.crs(), QgsProject.instance())
+
+    # --- Helper: sample Z from DTM (returns float or -9999) ---
+    def sample_dtm_xy(x, y):
+        if dtm is None:
+            return 0.0
+        # Transform coordinate if needed
+        if to_dtm is not None:
+            try:
+                from qgis.core import QgsPointXY
+                x, y = to_dtm.transform(QgsPointXY(x, y))
+            except Exception:
+                return -9999.0
+        from qgis.core import QgsPointXY
+        ident = dtm.dataProvider().identify(QgsPointXY(x, y), QgsRaster.IdentifyFormatValue)
+        if not ident.isValid():
+            return -9999.0
+        res = ident.results()
+        if not res:
+            return -9999.0
+        # take first band value (band keys are 1-based)
+        try:
+            # Prefer band 1 if present
+            return float(res.get(1, next(iter(res.values()))))
+        except Exception:
+            return -9999.0
+
+    # --- Geometry -> list of vertices (QgsPoint or QgsPointXY) ---
+    def vertices_from_geometry(geom):
+        if geom is None or geom.isEmpty():
+            return []
+        gtype = QgsWkbTypes.geometryType(geom.wkbType())
+        is_multi = QgsWkbTypes.isMultiType(geom.wkbType())
+
+        if gtype == QgsWkbTypes.PointGeometry:
+            if is_multi:
+                return list(geom.asMultiPoint())
+            else:
+                return [geom.asPoint()]
+
+        elif gtype == QgsWkbTypes.LineGeometry:
+            pts = []
+            if is_multi:
                 for line in geom.asMultiPolyline():
-                    points.extend(line)
-                # points = geom.asMultiPolyline()[0]
-        else:
-            if geom.type() == QgsWkbTypes.PointGeometry:
-                points = [geom.asPoint()]
-            elif geom.type() == QgsWkbTypes.LineGeometry:
-                points = geom.asPolyline()
+                    pts.extend(line)
+            else:
+                pts.extend(geom.asPolyline())
+            return pts
 
-        for p in points:
-            data['X'].append(p.x())
-            data['Y'].append(p.y())
-            if dtm is not None:
-                # Replace with your coordinates
+        elif gtype == QgsWkbTypes.PolygonGeometry:
+            pts = []
+            if is_multi:
+                mpoly = geom.asMultiPolygon()
+                for poly in mpoly:
+                    for ring in poly:         # exterior + interior rings
+                        pts.extend(ring)
+            else:
+                poly = geom.asPolygon()
+                for ring in poly:
+                    pts.extend(ring)
+            return pts
 
-                # Extract the value at the point
-                z_value = dtm.dataProvider().identify(p, QgsRaster.IdentifyFormatValue)
-                if z_value.isValid():
-                    z_value = z_value.results()[1]
-                else:
-                    z_value = -9999
-                data['Z'].append(z_value)
-            if dtm is None:
-                data['Z'].append(0)
-            for field in fields:
-                data[field.name()].append(feature[field.name()])
-    return pd.DataFrame(data)
+        # Other geometry types not handled
+        return []
+
+    # --- Build rows safely (one dict per sampled point) ---
+    rows = []
+    field_names = [f.name() for f in fields]
+
+    for f in feats:
+        geom = f.geometry()
+        pts = vertices_from_geometry(geom)
+
+        if not pts:
+            # If you want to keep attribute rows even when no vertices: uncomment below
+            # row = {name: f[name] for name in field_names}
+            # row.update({"X": None, "Y": None, "Z": None})
+            # rows.append(row)
+            continue
+
+        # Cache attributes once per feature and reuse for each sampled point
+        base_attrs = {name: f[name] for name in field_names}
+
+        for p in pts:
+            # QgsPoint vs QgsPointXY both have x()/y()
+            x, y = float(p.x()), float(p.y())
+            z = sample_dtm_xy(x, y)
+
+            row = {"X": x, "Y": y, "Z": z}
+            row.update(base_attrs)
+            rows.append(row)
+
+    # Create DataFrame; if empty, return with expected columns
+    if not rows:
+        cols = ["X", "Y", "Z"] + field_names
+        return pd.DataFrame(columns=cols)
+
+    return pd.DataFrame.from_records(rows)
 
 def GeoDataFrameToQgsLayer(qgs_algorithm, geodataframe, parameters, context, output_key, feedback=None):
     """
@@ -455,6 +601,98 @@ def dataframeToQgsLayer(
     feedback.setProgress(100)
     return sink, sink_id
 
+def matrixToDict(matrix, headers=("minx", "miny", "maxx", "maxy")) -> dict:
+    """
+    Convert a QgsProcessingParameterMatrix value to a dict with float values.
+    Accepts: [[minx,miny,maxx,maxy]] or [minx,miny,maxx,maxy].
+    Raises a clear error if an enum index (int) was passed by mistake.
+    """
+    # Guard: common mistake → using parameterAsEnum
+    if isinstance(matrix, int):
+        raise QgsProcessingException(
+            "Bounding Box was read with parameterAsEnum (got an int). "
+            "Use parameterAsMatrix for QgsProcessingParameterMatrix."
+        )
+
+    if matrix is None:
+        raise QgsProcessingException("Bounding box matrix is None.")
+
+    # Allow empty string from settings/defaults
+    if isinstance(matrix, str) and not matrix.strip():
+        raise QgsProcessingException("Bounding box matrix is empty.")
+
+    # Accept single-row matrix or flat list
+    if isinstance(matrix, (list, tuple)):
+        if matrix and isinstance(matrix[0], (list, tuple)):
+            row = matrix[0]
+        else:
+            row = matrix
+    else:
+        # last resort: try comma-separated string "minx,miny,maxx,maxy"
+        if isinstance(matrix, str) and "," in matrix:
+            row = [v.strip() for v in matrix.split(",")]
+        else:
+            raise QgsProcessingException(f"Unrecognized bounding box value: {type(matrix)}")
+
+    if len(row) < 4:
+        raise QgsProcessingException(f"Bounding box needs 4 numbers, got {len(row)}: {row}")
+
+    def _to_float(v):
+        if isinstance(v, str):
+            v = v.strip()
+        return float(v)
+
+    vals = list(map(_to_float, row[:4]))
+    bbox = dict(zip(headers, vals))
+
+    if not (bbox["minx"] < bbox["maxx"] and bbox["miny"] < bbox["maxy"]):
+        raise QgsProcessingException(f"Invalid bounding box: {bbox} (expect minx<maxx and miny<maxy)")
+
+    return bbox
+
+def dataframeToQgsTable(self, df, parameters, context, feedback, param_name):
+    if df is None or df.empty:
+        raise QgsProcessingException("Empty DataFrame.")
+
+    # 1) Field schema
+    fields = QgsFields()
+    def to_qvariant_type(s):
+        if pd.api.types.is_bool_dtype(s):    return QVariant.Bool
+        if pd.api.types.is_integer_dtype(s): return QVariant.LongLong
+        if pd.api.types.is_float_dtype(s):   return QVariant.Double
+        return QVariant.String
+
+    for col in df.columns:
+        fields.append(QgsField(str(col), to_qvariant_type(df[col])))
+
+    # 2) CRS: use project CRS if available, otherwise empty CRS
+    crs = context.project().crs() if context and context.project() else QgsCoordinateReferenceSystem()
+    
+    sink, dest_id = self.parameterAsSink(
+        parameters, param_name, context,
+        fields, QgsWkbTypes.NoGeometry, crs
+    )
+    if sink is None:
+        raise QgsProcessingException("Canot create output table (sink=None).")
+
+    # 3) Write features
+    for _, row in df.iterrows():
+        f = QgsFeature(fields)
+        attrs = []
+        for col in df.columns:
+            v = row[col]
+            # Convert numpy scalars to native Python types
+            if isinstance(v, (np.generic,)):
+                v = v.item()
+            # NaN/NaT → None
+            if pd.isna(v):
+                v = None
+            attrs.append(v)
+        f.setAttributes(attrs)
+        sink.addFeature(f)
+
+    return sink, dest_id
+
 from qgis.core import NULL
 from PyQt5.QtCore import QVariant
 
@@ -486,3 +724,4 @@ def qvariantToFloat(f, field_name):
         return float(val)
     except Exception:
         return None
+
