@@ -10,6 +10,7 @@
 """
 # Python imports
 from typing import Any, Optional
+import pandas as pd
 
 # QGIS imports
 from qgis import processing
@@ -260,9 +261,8 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
         missing_fields = []
         if unit_name_field != 'UNITNAME' and unit_name_field in geology_data.columns:
             geology_data = geology_data.rename(columns={unit_name_field: 'UNITNAME'})
-            units = units.rename(columns={unit_name_field: 'UNITNAME'})
-            units = units.drop_duplicates(subset=['UNITNAME']).reset_index(drop=True)
-            units = units.rename(columns={'UNITNAME': 'name'})
+        units_unique = units.drop_duplicates(subset=[unit_name_field]).reset_index(drop=True)
+        units = pd.DataFrame({'name': units_unique[unit_name_field]})
         if structure_data is not None:
             if structure_dipdir_field:
                 if structure_dipdir_field in structure_data.columns:
