@@ -10,7 +10,7 @@
 """
 # Python imports
 from typing import Any, Optional
-from qgis.PyQt.QtCore import QMetaType
+from qgis.PyQt.QtCore import QMetaType, QVariant
 from osgeo import gdal
 import pandas as pd
 
@@ -59,15 +59,15 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
 
     def displayName(self) -> str:
         """Return the algorithm display name."""
-        return "Loop3d: Sampler"
+        return "Spacing-Decimator Samplers"
 
     def group(self) -> str:
         """Return the algorithm group name."""
-        return "Loop3d"
+        return "Samplers"
 
     def groupId(self) -> str:
         """Return the algorithm group ID."""
-        return "Loop3d"
+        return "Samplers"
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
@@ -176,11 +176,11 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             samples = sampler.sample(spatial_data_gdf)
         
         fields = QgsFields()
-        fields.append(QgsField("ID", QMetaType.Type.QString))
-        fields.append(QgsField("X", QMetaType.Type.Float))
-        fields.append(QgsField("Y", QMetaType.Type.Float))
-        fields.append(QgsField("Z", QMetaType.Type.Float))
-        fields.append(QgsField("featureId", QMetaType.Type.QString))
+        fields.append(QgsField("ID", QVariant.String))
+        fields.append(QgsField("X", QVariant.Double))
+        fields.append(QgsField("Y", QVariant.Double))
+        fields.append(QgsField("Z", QVariant.Double))
+        fields.append(QgsField("featureId", QVariant.String))
 
         crs = None
         if spatial_data_gdf is not None and spatial_data_gdf.crs is not None:
