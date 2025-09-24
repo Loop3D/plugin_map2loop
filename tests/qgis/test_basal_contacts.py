@@ -21,7 +21,7 @@ class TestBasalContacts(unittest.TestCase):
         
         self.geology_file = self.input_dir / "geol_clip_no_gaps.shp"
         self.faults_file = self.input_dir / "faults_clip.shp"
-        self.strati_file = self.input_dir / "stratigraphic_column.gpkg"
+        self.strati_file = self.input_dir / "stratigraphic_column_testing.gpkg"
         
         self.assertTrue(self.geology_file.exists(), f"geology not found: {self.geology_file}")
         self.assertTrue(self.strati_file.exists(), f"strati not found: {self.strati_file}")
