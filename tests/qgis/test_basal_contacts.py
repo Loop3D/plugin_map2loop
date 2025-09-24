@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
-from qgis.core import QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis, QgsApplication
+from qgis.core import QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis, QgsApplication, QgsFeature, QgsField
+from qgis.PyQt.QtCore import QVariant
 from qgis.testing import start_app
 from m2l.processing.algorithms.extract_basal_contacts import BasalContactsAlgorithm
 from m2l.processing.provider import Map2LoopProvider
@@ -61,7 +62,24 @@ class TestBasalContacts(unittest.TestCase):
             "Rocklea Inlier greenstones",
             "Rocklea Inlier metagranitic unit"
         ]
+        strati_table = QgsVectorLayer(faults_layer.crs().authid(), "strati_column", "memory")
+        # define the single field
+        provider = strati_table.dataProvider()
+        vtype=QVariant.String
+        provider.addAttributes([QgsField("unit_name", vtype)])
+        strati_table.updateFields()
+        
+        # add features (one row per value)
+        feats = []
+        fields = strati_table.fields()
+        for val in strati_column:
+            f = QgsFeature(fields)
+            f.setAttributes([val])
+            feats.append(f)
 
+        if feats:
+            provider.addFeatures(feats)
+            strati_table.updateExtents()
         algorithm = BasalContactsAlgorithm()
         algorithm.initAlgorithm()
 
@@ -70,7 +88,7 @@ class TestBasalContacts(unittest.TestCase):
             'UNIT_NAME_FIELD': 'unitname',
             'FORMATION_FIELD': 'formation',
             'FAULTS': faults_layer,
-            'STRATIGRAPHIC_COLUMN': strati_column,
+            'STRATIGRAPHIC_COLUMN': strati_table,
             'IGNORE_UNITS': [],
             'BASAL_CONTACTS': 'memory:basal_contacts',
             'ALL_CONTACTS': 'memory:all_contacts'
