@@ -65,9 +65,10 @@ class TestBasalContacts(unittest.TestCase):
         strati_table = QgsVectorLayer(faults_layer.crs().authid(), "strati_column", "memory")
         # define the single field
         provider = strati_table.dataProvider()
+        vtype=QVariant.String
         provider.addAttributes([QgsField("unit_name", vtype)])
         strati_table.updateFields()
-        vtype=QVariant.String
+        
         # add features (one row per value)
         feats = []
         fields = strati_table.fields()
