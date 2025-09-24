@@ -28,6 +28,7 @@ from qgis.core import (
     QgsProcessingParameterMatrix, 
     QgsSettings,
     QgsProcessingParameterRasterLayer,
+    QgsProcessingParameterMapLayer
 )
 # Internal imports
 from ...main.vectorLayerWrapper import (
@@ -66,15 +67,15 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
 
     def displayName(self) -> str:
         """Return the algorithm display name."""
-        return "Loop3d: Thickness Calculator"
+        return "Thickness Calculator"
 
     def group(self) -> str:
         """Return the algorithm group name."""
-        return "Loop3d"
+        return "Thickness Calculators"
 
     def groupId(self) -> str:
         """Return the algorithm group ID."""
-        return "Loop3d"
+        return "Thickness_Calculators"
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
@@ -142,15 +143,12 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
             )
         )
         
-        strati_settings = QgsSettings()
-        last_strati_column = strati_settings.value("m2l/strati_column", "")
         self.addParameter(
-            QgsProcessingParameterMatrix(
-                name=self.INPUT_STRATI_COLUMN,
-                description="Stratigraphic Order",
-                headers=["Unit"],
-                numberRows=0,
-                defaultValue=last_strati_column
+            QgsProcessingParameterFeatureSource(
+                self.INPUT_STRATI_COLUMN,
+                "Stratigraphic Order",
+                [QgsProcessing.TypeVector],
+                defaultValue='formation',
             )
         )
         self.addParameter(
@@ -207,7 +205,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
         max_line_length = self.parameterAsSource(parameters, self.INPUT_MAX_LINE_LENGTH, context)
         basal_contacts = self.parameterAsSource(parameters, self.INPUT_BASAL_CONTACTS, context)
         geology_data = self.parameterAsSource(parameters, self.INPUT_GEOLOGY, context)
-        stratigraphic_order = self.parameterAsMatrix(parameters, self.INPUT_STRATI_COLUMN, context)
+        stratigraphic_order = self.parameterAsSource(parameters, self.INPUT_STRATI_COLUMN, context)
         structure_data = self.parameterAsSource(parameters, self.INPUT_STRUCTURE_DATA, context)
         structure_dipdir_field = self.parameterAsString(parameters, self.INPUT_DIPDIR_FIELD, context)
         structure_dip_field = self.parameterAsString(parameters, self.INPUT_DIP_FIELD, context)
@@ -216,8 +214,14 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
 
         bbox_settings = QgsSettings()
         bbox_settings.setValue("m2l/bounding_box", bounding_box)
-        strati_column_settings = QgsSettings()
-        strati_column_settings.setValue('m2l/strati_column', stratigraphic_order)
+        
+        if isinstance(stratigraphic_order, QgsProcessingParameterMapLayer) :
+            raise QgsProcessingException("Invalid stratigraphic column layer")
+        
+        if stratigraphic_order is not None:
+            # extract unit names from stratigraphic_order
+            field_name = "unit_name"
+            stratigraphic_order = [f[field_name] for f in stratigraphic_order.getFeatures()]
         # convert layers to dataframe or geodataframe
         units = qgsLayerToDataFrame(geology_data)
         geology_data = qgsLayerToGeoDataFrame(geology_data)
