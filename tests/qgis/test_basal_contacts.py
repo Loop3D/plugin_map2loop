@@ -21,9 +21,10 @@ class TestBasalContacts(unittest.TestCase):
         
         self.geology_file = self.input_dir / "geol_clip_no_gaps.shp"
         self.faults_file = self.input_dir / "faults_clip.shp"
+        self.strati_file = self.input_dir / "stratigraphic_column.gpkg"
         
         self.assertTrue(self.geology_file.exists(), f"geology not found: {self.geology_file}")
-
+        self.assertTrue(self.strati_file.exists(), f"strati not found: {self.strati_file}")
         if not self.faults_file.exists():
             QgsMessageLog.logMessage(f"faults not found: {self.faults_file}, will run test without faults", "TestBasalContacts", Qgis.Warning)
 
@@ -43,43 +44,7 @@ class TestBasalContacts(unittest.TestCase):
         
         QgsMessageLog.logMessage(f"geology layer: {geology_layer.featureCount()} features", "TestBasalContacts", Qgis.Critical)
         
-        strati_column = [
-            "Turee Creek Group",
-            "Boolgeeda Iron Formation",
-            "Woongarra Rhyolite",
-            "Weeli Wolli Formation",
-            "Brockman Iron Formation",
-            "Mount McRae Shale and Mount Sylvia Formation",
-            "Wittenoom Formation",
-            "Marra Mamba Iron Formation",
-            "Jeerinah Formation",
-            "Bunjinah Formation",
-            "Pyradie Formation",
-            "Fortescue Group",
-            "Hardey Formation",
-            "Boongal Formation",
-            "Mount Roe Basalt",
-            "Rocklea Inlier greenstones",
-            "Rocklea Inlier metagranitic unit"
-        ]
-        strati_table = QgsVectorLayer(faults_layer.crs().authid(), "strati_column", "memory")
-        # define the single field
-        provider = strati_table.dataProvider()
-        vtype=QVariant.String
-        provider.addAttributes([QgsField("unit_name", vtype)])
-        strati_table.updateFields()
-        
-        # add features (one row per value)
-        feats = []
-        fields = strati_table.fields()
-        for val in strati_column:
-            f = QgsFeature(fields)
-            f.setAttributes([val])
-            feats.append(f)
-
-        if feats:
-            provider.addFeatures(feats)
-            strati_table.updateExtents()
+        strati_table = QgsVectorLayer(str(self.strati_file), "strati", "ogr")
         algorithm = BasalContactsAlgorithm()
         algorithm.initAlgorithm()
 
