@@ -233,19 +233,22 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
             'maxx': extent.xMaximum(),
             'maxy': extent.yMaximum()
         }
-        stratigraphic_column_layer = self.parameterAsVectorLayer(parameters, self.INPUT_STRATIGRAPHIC_COLUMN_LAYER, context)
-        stratigraphic_order = None
-        if stratigraphic_column_layer is not None and stratigraphic_column_layer.isValid():
-            stratigraphic_order=[]
-            stratigraphic_order_df = qgsLayerToDataFrame(stratigraphic_column_layer)
-            stratigraphic_order_df = stratigraphic_order_df.sort_values('order')
-            for _, row in stratigraphic_order_df.iterrows():
-                stratigraphic_order.append(row['unit_name'])
 
+        stratigraphic_column_source = self.parameterAsSource(parameters, self.INPUT_STRATIGRAPHIC_COLUMN_LAYER, context)
+        stratigraphic_order = []
+        if stratigraphic_column_source is not None:
+            ordered_pairs =[]
+            for feature in stratigraphic_column_source.getFeatures():
+                order = feature.attribute('order')
+                unit_name = feature.attribute('unit_name')
+                ordered_pairs.append((order, unit_name))
+            ordered_pairs.sort(key=lambda x: x[0])
+            stratigraphic_order = [pair[1] for pair in ordered_pairs]
+            feedback.pushInfo(f"DEBUG: parameterAsVectorLayer Stratigraphic order: {stratigraphic_order}")
         else:
             matrix_stratigraphic_order = self.parameterAsMatrix(parameters, self.INPUT_STRATI_COLUMN, context)
             if matrix_stratigraphic_order:
-                stratigraphic_order = [row[0] for row in matrix_stratigraphic_order if row and len(row) > 0]
+                stratigraphic_order = [str(row) for row in matrix_stratigraphic_order if row]
             else:
                 raise QgsProcessingException("Stratigraphic column layer is required")
         if stratigraphic_order:
