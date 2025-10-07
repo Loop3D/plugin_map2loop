@@ -24,6 +24,7 @@ from qgis.core import (
     QgsProcessingParameterField,
     QgsProcessingParameterRasterLayer,
     QgsProcessingParameterMatrix,
+    QgsCoordinateReferenceSystem,
     QgsVectorLayer,
     QgsWkbTypes,
     QgsSettings
@@ -73,13 +74,13 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
         return "loop_sorter"
 
     def displayName(self) -> str:
-        return "Loop3d: Stratigraphic sorter"
+        return "Automatic Stratigraphic Column"
 
     def group(self) -> str:
-        return "Loop3d"
+        return "Stratigraphy"
 
     def groupId(self) -> str:
-        return "Loop3d"
+        return "Stratigraphy_Column"
     
     def updateParameters(self, parameters):
         selected_method = parameters.get(self.METHOD, 0)
@@ -339,7 +340,6 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
     # ----------------------------------------------------------
     def createInstance(self) -> QgsProcessingAlgorithm:
         return StratigraphySorterAlgorithm()
-
 
 # -------------------------------------------------------------------------
 #  Helper stub – you must replace with *your* conversion logic

@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
-from qgis.core import QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis, QgsApplication
+from qgis.core import QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis, QgsApplication, QgsFeature, QgsField
+from qgis.PyQt.QtCore import QVariant
 from qgis.testing import start_app
 from m2l.processing.algorithms.extract_basal_contacts import BasalContactsAlgorithm
 from m2l.processing.provider import Map2LoopProvider
@@ -20,9 +21,10 @@ class TestBasalContacts(unittest.TestCase):
         
         self.geology_file = self.input_dir / "geol_clip_no_gaps.shp"
         self.faults_file = self.input_dir / "faults_clip.shp"
+        self.strati_file = self.input_dir / "stratigraphic_column_testing.gpkg"
         
         self.assertTrue(self.geology_file.exists(), f"geology not found: {self.geology_file}")
-
+        self.assertTrue(self.strati_file.exists(), f"strati not found: {self.strati_file}")
         if not self.faults_file.exists():
             QgsMessageLog.logMessage(f"faults not found: {self.faults_file}, will run test without faults", "TestBasalContacts", Qgis.Warning)
 
@@ -42,26 +44,7 @@ class TestBasalContacts(unittest.TestCase):
         
         QgsMessageLog.logMessage(f"geology layer: {geology_layer.featureCount()} features", "TestBasalContacts", Qgis.Critical)
         
-        strati_column = [
-            "Turee Creek Group",
-            "Boolgeeda Iron Formation",
-            "Woongarra Rhyolite",
-            "Weeli Wolli Formation",
-            "Brockman Iron Formation",
-            "Mount McRae Shale and Mount Sylvia Formation",
-            "Wittenoom Formation",
-            "Marra Mamba Iron Formation",
-            "Jeerinah Formation",
-            "Bunjinah Formation",
-            "Pyradie Formation",
-            "Fortescue Group",
-            "Hardey Formation",
-            "Boongal Formation",
-            "Mount Roe Basalt",
-            "Rocklea Inlier greenstones",
-            "Rocklea Inlier metagranitic unit"
-        ]
-
+        strati_table = QgsVectorLayer(str(self.strati_file), "strati", "ogr")
         algorithm = BasalContactsAlgorithm()
         algorithm.initAlgorithm()
 
@@ -70,7 +53,7 @@ class TestBasalContacts(unittest.TestCase):
             'UNIT_NAME_FIELD': 'unitname',
             'FORMATION_FIELD': 'formation',
             'FAULTS': faults_layer,
-            'STRATIGRAPHIC_COLUMN': strati_column,
+            'STRATIGRAPHIC_COLUMN': strati_table,
             'IGNORE_UNITS': [],
             'BASAL_CONTACTS': 'memory:basal_contacts',
             'ALL_CONTACTS': 'memory:all_contacts'

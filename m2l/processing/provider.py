@@ -19,6 +19,7 @@ from m2l.__about__ import (
 from .algorithms import (
     BasalContactsAlgorithm,
     StratigraphySorterAlgorithm,
+    UserDefinedStratigraphyAlgorithm,
     ThicknessCalculatorAlgorithm,
     SamplerAlgorithm
 )
@@ -35,6 +36,7 @@ class Map2LoopProvider(QgsProcessingProvider):
         """Loads all algorithms belonging to this provider."""
         self.addAlgorithm(BasalContactsAlgorithm())
         self.addAlgorithm(StratigraphySorterAlgorithm())
+        self.addAlgorithm(UserDefinedStratigraphyAlgorithm())
         self.addAlgorithm(ThicknessCalculatorAlgorithm())
         self.addAlgorithm(SamplerAlgorithm())
 
