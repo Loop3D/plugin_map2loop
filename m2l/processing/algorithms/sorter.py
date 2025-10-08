@@ -41,6 +41,7 @@ from map2loop.sorter import (
     SorterUseNetworkX,
     SorterUseHint,      # kept for backwards compatibility
 )
+from map2loop.contact_extractor import ContactExtractor
 from ...main.vectorLayerWrapper import qgsLayerToGeoDataFrame, qvariantToFloat
 
 # a lookup so we don’t need a giant if/else block
@@ -65,7 +66,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
     INPUT_STRATI_COLUMN = "INPUT_STRATI_COLUMN"
     SORTING_ALGORITHM  = "SORTING_ALGORITHM"
     OUTPUT = "OUTPUT"
-    CONTACTS_LAYER = "CONTACTS_LAYER"
+    FAULTS_LAYER = "FAULTS_LAYER"
 
     # ----------------------------------------------------------
     #  Metadata
@@ -125,7 +126,26 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 self.INPUT_GEOLOGY,
                 "Geology polygons",
                 [QgsProcessing.TypeVectorPolygon],
-                optional=True
+                optional=False
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterField(
+                'UNIT_NAME_FIELD',
+                'Unit Name Field',
+                parentLayerParameterName=self.INPUT_GEOLOGY,
+                type=QgsProcessingParameterField.String,
+                defaultValue='unitname'
+            )
+        )
+
+        self.addParameter(
+            QgsProcessingParameterFeatureSource(
+                "FAULTS_LAYER",
+                "Faults Layer",
+                [QgsProcessing.TypeVectorLine],
+                optional=True,
             )
         )
 
@@ -219,15 +239,6 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 optional=True,
             )
         )
-
-        self.addParameter(
-            QgsProcessingParameterFeatureSource(
-                "CONTACTS_LAYER",
-                "Contacts Layer",
-                [QgsProcessing.TypeVectorLine],
-                optional=False,
-            )
-        )
         
         self.addParameter(
             QgsProcessingParameterFeatureSink(
@@ -256,11 +267,24 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 
         algo_index: int = self.parameterAsEnum(parameters, self.SORTING_ALGORITHM, context)
         sorter_cls = list(SORTER_LIST.values())[algo_index]
-        contacts_layer = self.parameterAsVectorLayer(parameters, self.CONTACTS_LAYER, context)
+        faults_layer = self.parameterAsVectorLayer(parameters, self.FAULTS_LAYER, context)
         in_layer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
         output_file = self.parameterAsFileOutput(parameters, 'JSON_OUTPUT', context)
         
-        units_df, relationships_df, contacts_df= build_input_frames(in_layer,contacts_layer, feedback,parameters)
+        geology_gdf = qgsLayerToGeoDataFrame(in_layer)
+        faults_gdf = qgsLayerToGeoDataFrame(faults_layer) if faults_layer else None
+        
+        unit_name_field = self.parameterAsString(parameters, 'UNIT_NAME_FIELD', context)
+        if unit_name_field in geology_gdf.columns:
+            geology_gdf = geology_gdf.rename(columns={unit_name_field: 'UNITNAME'})
+        
+            feedback.pushInfo("Extracting contacts from geology...")
+            contact_extractor = ContactExtractor(geology_gdf, faults_gdf)
+            all_contacts = contact_extractor.extract_all_contacts()
+        else:
+            raise QgsProcessingException("Unit Name Field for geology layer is required for contacts extraction")
+        
+        units_df, relationships_df, contacts_df = build_input_frames(in_layer, all_contacts, feedback, parameters)
 
         if sorter_cls == SorterObservationProjections:
             geology_gdf = qgsLayerToGeoDataFrame(in_layer)
@@ -344,7 +368,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 # -------------------------------------------------------------------------
 #  Helper stub – you must replace with *your* conversion logic
 # -------------------------------------------------------------------------
-def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, feedback, parameters, user_defined_units=None) -> tuple:
+def build_input_frames(layer: QgsVectorLayer, contacts_gdf, feedback, parameters, user_defined_units=None) -> tuple:
     """
     Placeholder that turns the geology layer (and any other project
     layers) into the four objects required by the sorter.
@@ -384,26 +408,27 @@ def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, fee
         if not group_field:
             raise QgsProcessingException("Group Field is required")
 
+        unique_units = {}
         units_records = []
         for f in layer.getFeatures():
-            units_records.append(
-                dict(
-                    layerId=f.id(),
-                    name=f[unit_name_field],          
-                    minAge=qvariantToFloat(f, min_age_field),
-                    maxAge=qvariantToFloat(f, max_age_field),
-                    group=f[group_field],
+            unit_name = f[unit_name_field]
+            if unit_name not in unique_units:
+                unique_units[unit_name] = len(unique_units)
+                units_records.append(
+                    dict(
+                        layerId=len(units_records),
+                        name=f[unit_name_field],
+                        minAge=qvariantToFloat(f, min_age_field),
+                        maxAge=qvariantToFloat(f, max_age_field),
+                        group=f[group_field],
+                    )
                 )
-            )
         units_df = pd.DataFrame.from_records(units_records)
 
     feedback.pushInfo(f"Units → {len(units_df)}  records")
     # map_data can be mocked if you only use Age-based sorter
 
-    if not contacts_layer or not contacts_layer.isValid():
-        raise QgsProcessingException("No contacts layer provided")
-
-    contacts_df = qgsLayerToGeoDataFrame(contacts_layer) if contacts_layer else pd.DataFrame()
+    contacts_df = contacts_gdf if contacts_gdf is not None else pd.DataFrame()
     if not contacts_df.empty:
         relationships_df = contacts_df.copy()
         if 'length' in contacts_df.columns:
@@ -414,5 +439,6 @@ def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, fee
         feedback.pushInfo(f"Relationships → {len(relationships_df)} records")
     else:
         relationships_df = pd.DataFrame()
+        feedback.pushInfo("No contacts extracted")
 
     return units_df, relationships_df, contacts_df
