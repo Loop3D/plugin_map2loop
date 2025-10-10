@@ -225,7 +225,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 "CONTACTS_LAYER",
                 "Contacts Layer",
                 [QgsProcessing.TypeVectorLine],
-                optional=False,
+                optional=True,
             )
         )
         
@@ -256,9 +256,14 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 
         algo_index: int = self.parameterAsEnum(parameters, self.SORTING_ALGORITHM, context)
         sorter_cls = list(SORTER_LIST.values())[algo_index]
+        sorter_name = list(SORTER_LIST.keys())[algo_index]
+        requires_contacts = sorter_cls in [SorterAlpha, SorterMaximiseContacts, SorterObservationProjections]
         contacts_layer = self.parameterAsVectorLayer(parameters, self.CONTACTS_LAYER, context)
         in_layer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
         output_file = self.parameterAsFileOutput(parameters, 'JSON_OUTPUT', context)
+
+        if requires_contacts and not contacts_layer or not contacts_layer.isValid():
+            raise QgsProcessingException(f"{sorter_name} requires a contacts layer")
         
         units_df, relationships_df, contacts_df= build_input_frames(in_layer,contacts_layer, feedback,parameters)
 
