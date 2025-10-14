@@ -43,7 +43,6 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
     INPUT_STRATI_COLUMN = 'STRATIGRAPHIC_COLUMN'
     INPUT_IGNORE_UNITS = 'IGNORE_UNITS'
     OUTPUT = "BASAL_CONTACTS"
-    ALL_CONTACTS = "ALL_CONTACTS"
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -127,13 +126,6 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-        self.addParameter(
-            QgsProcessingParameterFeatureSink(
-                "ALL_CONTACTS",
-                "All Contacts",
-            )
-        )
-
     def processAlgorithm(
         self,
         parameters: dict[str, Any],
@@ -178,7 +170,6 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
 
         feedback.pushInfo("Extracting Basal Contacts...")
         contact_extractor = ContactExtractor(geology, faults)
-        all_contacts = contact_extractor.extract_all_contacts()
         basal_contacts = contact_extractor.extract_basal_contacts(strati_order)
         
         feedback.pushInfo("Exporting Basal Contacts Layer...")
@@ -190,15 +181,7 @@ class BasalContactsAlgorithm(QgsProcessingAlgorithm):
             output_key=self.OUTPUT,
             feedback=feedback,
             )
-        contacts_layer = GeoDataFrameToQgsLayer(
-            self, 
-            all_contacts,
-            parameters=parameters,
-            context=context,
-            output_key=self.ALL_CONTACTS,
-            feedback=feedback,
-            )
-        return {self.OUTPUT: basal_contacts, self.ALL_CONTACTS: contacts_layer}
+        return {self.OUTPUT: basal_contacts}
 
     def createInstance(self) -> QgsProcessingAlgorithm:
         """Create a new instance of the algorithm."""
