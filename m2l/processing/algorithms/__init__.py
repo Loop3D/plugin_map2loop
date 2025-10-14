@@ -1,4 +1,5 @@
 from .extract_basal_contacts import BasalContactsAlgorithm
+from .extract_contacts import ContactsAlgorithm
 from .sorter import StratigraphySorterAlgorithm
 from .user_defined_sorter import UserDefinedStratigraphyAlgorithm
 from .thickness_calculator import ThicknessCalculatorAlgorithm
