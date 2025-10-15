@@ -10,7 +10,7 @@
 """
 # Python imports
 from typing import Any, Optional
-from qgis.PyQt.QtCore import QMetaType
+from qgis.PyQt.QtCore import QVariant
 from osgeo import gdal
 import pandas as pd
 
@@ -182,11 +182,11 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
                 dtype_str = str(dtype)
             
                 if dtype_str in ['float16', 'float32', 'float64']:
-                    field_type = QMetaType.Type.Double
+                    field_type = QVariant.Double
                 elif dtype_str in ['int8', 'int16', 'int32', 'int64']:
-                    field_type = QMetaType.Type.Int
+                    field_type = QVariant.Int
                 else:
-                    field_type = QMetaType.Type.QString 
+                    field_type = QVariant.String
                 
                 fields.append(QgsField(column_name, field_type))
 
