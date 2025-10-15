@@ -48,6 +48,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
 
     INPUT_THICKNESS_CALCULATOR_TYPE = 'THICKNESS_CALCULATOR_TYPE'
     INPUT_DTM = 'DTM'
+    INPUT_BOUNDING_BOX_TYPE = 'BOUNDING_BOX_TYPE'
     INPUT_BOUNDING_BOX = 'BOUNDING_BOX'
     INPUT_MAX_LINE_LENGTH = 'MAX_LINE_LENGTH'
     INPUT_STRATI_COLUMN = 'STRATIGRAPHIC_COLUMN'
@@ -97,6 +98,29 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
                 "DTM (InterpolatedStructure)",
                 [QgsProcessing.TypeRaster],
                 optional=True,
+            )
+        )
+        
+        self.addParameter(
+            QgsProcessingParameterEnum(
+                self.INPUT_BOUNDING_BOX_TYPE,
+                "Bounding Box Type",
+                options=['Extract from geology layer', 'User defined'],
+                allowMultiple=False,
+                defaultValue=1
+            )
+        )
+        
+        bbox_settings = QgsSettings()
+        last_bbox = bbox_settings.value("m2l/bounding_box", "")
+        self.addParameter(
+            QgsProcessingParameterMatrix(
+                self.INPUT_BOUNDING_BOX,
+                description="Static Bounding Box",
+                headers=['minx','miny','maxx','maxy'],
+                numberRows=1,
+                defaultValue=last_bbox,
+                optional=True
             )
         )
         
@@ -213,7 +237,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
         thickness_type_index = self.parameterAsEnum(parameters, self.INPUT_THICKNESS_CALCULATOR_TYPE, context)
         thickness_type = ['InterpolatedStructure', 'StructuralPoint'][thickness_type_index]
         dtm_data = self.parameterAsRasterLayer(parameters, self.INPUT_DTM, context)
-        bounding_box = self.parameterAsMatrix(parameters, self.INPUT_BOUNDING_BOX, context)
+        bounding_box_type = self.parameterAsEnum(parameters, self.INPUT_BOUNDING_BOX_TYPE, context)
         max_line_length = self.parameterAsSource(parameters, self.INPUT_MAX_LINE_LENGTH, context)
         basal_contacts = self.parameterAsSource(parameters, self.INPUT_BASAL_CONTACTS, context)
         geology_data = self.parameterAsSource(parameters, self.INPUT_GEOLOGY, context)
@@ -225,14 +249,26 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
         sampled_contacts = self.parameterAsSource(parameters, self.INPUT_SAMPLED_CONTACTS, context)
         unit_name_field = self.parameterAsString(parameters, self.INPUT_UNIT_NAME_FIELD, context)
 
-        geology_layer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
-        extent = geology_layer.extent()
-        bounding_box = {
-            'minx': extent.xMinimum(),
-            'miny': extent.yMinimum(),
-            'maxx': extent.xMaximum(),
-            'maxy': extent.yMaximum()
-        }
+        if bounding_box_type == 0:
+            geology_layer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
+            extent = geology_layer.extent()
+            bounding_box = {
+                'minx': extent.xMinimum(),
+                'miny': extent.yMinimum(),
+                'maxx': extent.xMaximum(),
+                'maxy': extent.yMaximum()
+            }
+            feedback.pushInfo("Using bounding box from geology layer")
+        else:
+            static_bbox_matrix = self.parameterAsMatrix(parameters, self.INPUT_BOUNDING_BOX, context)
+            if not static_bbox_matrix or len(static_bbox_matrix) == 0:
+                raise QgsProcessingException("Bounding box is required")
+            
+            bounding_box = matrixToDict(static_bbox_matrix)
+            
+            bbox_settings = QgsSettings()
+            bbox_settings.setValue("m2l/bounding_box", static_bbox_matrix)
+            feedback.pushInfo("Using bounding box from user input")
 
         stratigraphic_column_source = self.parameterAsSource(parameters, self.INPUT_STRATIGRAPHIC_COLUMN_LAYER, context)
         stratigraphic_order = []
