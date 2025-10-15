@@ -57,7 +57,7 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
     INPUT_DIPDIR_FIELD = 'DIPDIR_FIELD'
     INPUT_DIP_FIELD = 'DIP_FIELD'
     INPUT_GEOLOGY = 'GEOLOGY'
-    INPUT_THICKNESS_ORIENTATION_TYPE = 'THICKNESS_ORIENTATION_TYPE'
+    INPUT_ORIENTATION_TYPE = 'ORIENTATION_TYPE'
     INPUT_UNIT_NAME_FIELD = 'UNIT_NAME_FIELD'
     INPUT_SAMPLED_CONTACTS = 'SAMPLED_CONTACTS'
     INPUT_STRATIGRAPHIC_COLUMN_LAYER = 'STRATIGRAPHIC_COLUMN_LAYER'
@@ -195,8 +195,8 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
         )
         self.addParameter(
             QgsProcessingParameterEnum(
-                'THICKNESS_ORIENTATION_TYPE',
-                'Thickness Orientation Type',
+                self.INPUT_ORIENTATION_TYPE,
+                'Orientation Type',
                 options=['Dip Direction', 'Strike'],
                 defaultValue=0  # Default to Dip Direction
             )
@@ -242,8 +242,8 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
         basal_contacts = self.parameterAsSource(parameters, self.INPUT_BASAL_CONTACTS, context)
         geology_data = self.parameterAsSource(parameters, self.INPUT_GEOLOGY, context)
         structure_data = self.parameterAsSource(parameters, self.INPUT_STRUCTURE_DATA, context)
-        thickness_orientation_type = self.parameterAsEnum(parameters, self.INPUT_THICKNESS_ORIENTATION_TYPE, context)
-        is_strike = (thickness_orientation_type == 1)
+        orientation_type = self.parameterAsEnum(parameters, self.INPUT_ORIENTATION_TYPE, context)
+        is_strike = (orientation_type == 1)
         structure_dipdir_field = self.parameterAsString(parameters, self.INPUT_DIPDIR_FIELD, context)
         structure_dip_field = self.parameterAsString(parameters, self.INPUT_DIP_FIELD, context)
         sampled_contacts = self.parameterAsSource(parameters, self.INPUT_SAMPLED_CONTACTS, context)
