@@ -7,13 +7,13 @@ on:
 
   pull_request:
     branches:
-      - master
+      - main
     paths:
       - '**.py'
   workflow_dispatch:
 
 env:
-  PROJECT_FOLDER: "map2loop"
+  PROJECT_FOLDER: "m2l"
   PYTHON_VERSION: 3.9
 permissions:
   contents: write
@@ -55,5 +55,5 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           title: "style: auto format fixes"
           body: "This PR applies style fixes by black and ruff."
-          base: master
+          base: main
           branch: lint/style-fixes-${{ github.run_id }}

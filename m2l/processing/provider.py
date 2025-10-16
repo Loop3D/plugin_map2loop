@@ -10,10 +10,18 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 
 # project
-from map2loop.__about__ import (
+from m2l.__about__ import (
     __icon_path__,
     __title__,
     __version__,
+)
+
+from .algorithms import (
+    BasalContactsAlgorithm,
+    StratigraphySorterAlgorithm,
+    UserDefinedStratigraphyAlgorithm,
+    ThicknessCalculatorAlgorithm,
+    SamplerAlgorithm
 )
 
 # ############################################################################
@@ -26,7 +34,11 @@ class Map2LoopProvider(QgsProcessingProvider):
 
     def loadAlgorithms(self):
         """Loads all algorithms belonging to this provider."""
-        pass
+        self.addAlgorithm(BasalContactsAlgorithm())
+        self.addAlgorithm(StratigraphySorterAlgorithm())
+        self.addAlgorithm(UserDefinedStratigraphyAlgorithm())
+        self.addAlgorithm(ThicknessCalculatorAlgorithm())
+        self.addAlgorithm(SamplerAlgorithm())
 
     def id(self) -> str:
         """Unique provider id, used for identifying it. This string should be unique, \
