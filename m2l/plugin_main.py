@@ -10,7 +10,7 @@ from typing import Optional
 # PyQGIS
 from qgis.core import QgsApplication, QgsSettings
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import QCoreApplication, QLocale, QTranslator, QUrl
+from qgis.PyQt.QtCore import QCoreApplication, QLocale, QTranslator, QUrl, Qt
 from qgis.PyQt.QtGui import QDesktopServices, QIcon
 from qgis.PyQt.QtWidgets import QAction
 
@@ -22,6 +22,7 @@ from m2l.__about__ import (
     __uri_homepage__,
 )
 from m2l.gui.dlg_settings import PlgOptionsFactory
+from m2l.gui.map2loop_dockwidget import Map2loopDockWidget
 from m2l.processing import (
     Map2LoopProvider,
 )
@@ -43,6 +44,7 @@ class Map2LoopPlugin:
         self.iface = iface
         self.log = PlgLogger().log
         self.provider: Optional[Map2LoopProvider] = None
+        self.dockwidget: Optional[Map2loopDockWidget] = None
 
         # translation
         # initialize the locale
@@ -89,9 +91,19 @@ class Map2LoopPlugin:
             )
         )
 
-        # -- Menu
+        self.action_show_dockwidget = QAction(
+            QIcon(str(__icon_path__)),
+            self.tr("Map2Loop"),
+            self.iface.mainWindow(),
+        )
+        self.action_show_dockwidget.setCheckable(True)
+        self.action_show_dockwidget.triggered.connect(self.toggle_dockwidget)
+
+        self.iface.addPluginToMenu(__title__, self.action_show_dockwidget)
         self.iface.addPluginToMenu(__title__, self.action_settings)
         self.iface.addPluginToMenu(__title__, self.action_help)
+        
+        self.iface.addToolBarIcon(self.action_show_dockwidget)
         # -- Processing
         self.initProcessing()
 
@@ -117,6 +129,26 @@ class Map2LoopPlugin:
         self.provider = Map2LoopProvider()
         QgsApplication.processingRegistry().addProvider(self.provider)
 
+    def init_dockwidget(self):
+        if self.dockwidget is None:
+            self.dockwidget = Map2loopDockWidget()
+            self.dockwidget.closingPlugin.connect(self.on_dockwidget_closed)
+            self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dockwidget)
+
+    def toggle_dockwidget(self):
+        if self.dockwidget is None:
+            self.init_dockwidget()
+        
+        if self.dockwidget.isVisible():
+            self.dockwidget.hide()
+            self.action_show_dockwidget.setChecked(False)
+        else:
+            self.dockwidget.show()
+            self.action_show_dockwidget.setChecked(True)
+
+    def on_dockwidget_closed(self):
+        self.action_show_dockwidget.setChecked(False)
+
     def tr(self, message: str) -> str:
         """Get the translation for a string using Qt translation API.
 
@@ -130,7 +162,13 @@ class Map2LoopPlugin:
 
     def unload(self):
         """Cleans up when plugin is disabled/uninstalled."""
-        # -- Clean up menu
+        if self.dockwidget:
+            self.iface.removeDockWidget(self.dockwidget)
+            self.dockwidget = None
+        
+        self.iface.removeToolBarIcon(self.action_show_dockwidget)
+        
+        self.iface.removePluginMenu(__title__, self.action_show_dockwidget)
         self.iface.removePluginMenu(__title__, self.action_help)
         self.iface.removePluginMenu(__title__, self.action_settings)
 
@@ -146,6 +184,7 @@ class Map2LoopPlugin:
             )
 
         # remove actions
+        del self.action_show_dockwidget
         del self.action_settings
         del self.action_help
 
