@@ -10,7 +10,7 @@
 """
 # Python imports
 from typing import Any, Optional
-from qgis.PyQt.QtCore import QMetaType, QVariant
+from qgis.PyQt.QtCore import QVariant
 from osgeo import gdal
 import pandas as pd
 
