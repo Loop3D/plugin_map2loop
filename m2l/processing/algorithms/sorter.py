@@ -125,7 +125,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 self.INPUT_GEOLOGY,
                 "Geology polygons",
                 [QgsProcessing.TypeVectorPolygon],
-                optional=True
+                optional=False
             )
         )
 
@@ -161,7 +161,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 optional=True
             )
         )
-        
+
         self.addParameter(
             QgsProcessingParameterField(
                 'GROUP_FIELD',
@@ -225,7 +225,7 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
                 "CONTACTS_LAYER",
                 "Contacts Layer",
                 [QgsProcessing.TypeVectorLine],
-                optional=False,
+                optional=True,
             )
         )
         
@@ -256,9 +256,14 @@ class StratigraphySorterAlgorithm(QgsProcessingAlgorithm):
 
         algo_index: int = self.parameterAsEnum(parameters, self.SORTING_ALGORITHM, context)
         sorter_cls = list(SORTER_LIST.values())[algo_index]
+        sorter_name = list(SORTER_LIST.keys())[algo_index]
+        requires_contacts = sorter_cls in [SorterAlpha, SorterMaximiseContacts, SorterObservationProjections]
         contacts_layer = self.parameterAsVectorLayer(parameters, self.CONTACTS_LAYER, context)
         in_layer = self.parameterAsVectorLayer(parameters, self.INPUT_GEOLOGY, context)
         output_file = self.parameterAsFileOutput(parameters, 'JSON_OUTPUT', context)
+
+        if requires_contacts and not contacts_layer or not contacts_layer.isValid():
+            raise QgsProcessingException(f"{sorter_name} requires a contacts layer")
         
         units_df, relationships_df, contacts_df= build_input_frames(in_layer,contacts_layer, feedback,parameters)
 
@@ -384,17 +389,21 @@ def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, fee
         if not group_field:
             raise QgsProcessingException("Group Field is required")
 
+        unique_units = {}
         units_records = []
         for f in layer.getFeatures():
-            units_records.append(
-                dict(
-                    layerId=f.id(),
-                    name=f[unit_name_field],          
-                    minAge=qvariantToFloat(f, min_age_field),
-                    maxAge=qvariantToFloat(f, max_age_field),
-                    group=f[group_field],
+            unit_name = f[unit_name_field]
+            if unit_name not in unique_units:
+                unique_units[unit_name] = len(unique_units)
+                units_records.append(
+                    dict(
+                        layerId=len(units_records),
+                        name=f[unit_name_field],
+                        minAge=qvariantToFloat(f, min_age_field),
+                        maxAge=qvariantToFloat(f, max_age_field),
+                        group=f[group_field],
+                    )
                 )
-            )
         units_df = pd.DataFrame.from_records(units_records)
 
     feedback.pushInfo(f"Units → {len(units_df)}  records")
@@ -402,8 +411,8 @@ def build_input_frames(layer: QgsVectorLayer,contacts_layer: QgsVectorLayer, fee
 
     if not contacts_layer or not contacts_layer.isValid():
         raise QgsProcessingException("No contacts layer provided")
-
     contacts_df = qgsLayerToGeoDataFrame(contacts_layer) if contacts_layer else pd.DataFrame()
+
     if not contacts_df.empty:
         relationships_df = contacts_df.copy()
         if 'length' in contacts_df.columns:
