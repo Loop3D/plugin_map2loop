@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 from qgis.core import QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis, QgsApplication
 from qgis.testing import start_app
-from m2l.processing.algorithms.sampler import SamplerAlgorithm
-from m2l.processing.provider import Map2LoopProvider
+from loopstructural.processing.algorithms.sampler import SamplerAlgorithm
+from loopstructural.processing.provider import Map2LoopProvider
 
 class TestSamplerSpacing(unittest.TestCase):
 

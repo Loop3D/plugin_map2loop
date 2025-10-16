@@ -10,7 +10,7 @@ from qgis.PyQt.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 
 # project
-from m2l.__about__ import (
+from loopstructural.__about__ import (
     __icon_path__,
     __title__,
     __version__,

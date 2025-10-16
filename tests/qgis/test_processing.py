@@ -15,7 +15,7 @@ Usage from the repo root folder:
 from qgis.core import QgsApplication
 from qgis.testing import start_app, unittest
 
-from m2l.processing.provider import (
+from loopstructural.processing.provider import (
     Map2LoopProvider,
 )
 

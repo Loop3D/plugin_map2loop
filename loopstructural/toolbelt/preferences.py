@@ -11,9 +11,9 @@ from dataclasses import asdict, dataclass, fields
 from qgis.core import QgsSettings
 
 # package
-import m2l.toolbelt.log_handler as log_hdlr
-from m2l.__about__ import __title__, __version__
-from m2l.toolbelt.env_var_parser import EnvVarParser
+import loopstructural.toolbelt.log_handler as log_hdlr
+from loopstructural.__about__ import __title__, __version__
+from loopstructural.toolbelt.env_var_parser import EnvVarParser
 
 # ############################################################################
 # ########## Classes ###############

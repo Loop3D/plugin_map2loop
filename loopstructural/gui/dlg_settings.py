@@ -18,15 +18,15 @@ from qgis.PyQt.QtCore import QUrl
 from qgis.PyQt.QtGui import QDesktopServices, QIcon
 
 # project
-from m2l.__about__ import (
+from loopstructural.__about__ import (
     __icon_path__,
     __title__,
     __uri_homepage__,
     __uri_tracker__,
     __version__,
 )
-from m2l.toolbelt import PlgLogger, PlgOptionsManager
-from m2l.toolbelt.preferences import PlgSettingsStructure
+from loopstructural.toolbelt import PlgLogger, PlgOptionsManager
+from loopstructural.toolbelt.preferences import PlgSettingsStructure
 
 # ############################################################################
 # ########## Globals ###############

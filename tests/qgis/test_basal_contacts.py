@@ -3,8 +3,8 @@ from pathlib import Path
 from qgis.core import QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback, QgsMessageLog, Qgis, QgsApplication, QgsFeature, QgsField
 from qgis.PyQt.QtCore import QVariant
 from qgis.testing import start_app
-from m2l.processing.algorithms.extract_basal_contacts import BasalContactsAlgorithm
-from m2l.processing.provider import Map2LoopProvider
+from loopstructural.processing.algorithms.extract_basal_contacts import BasalContactsAlgorithm
+from loopstructural.processing.provider import Map2LoopProvider
 
 class TestBasalContacts(unittest.TestCase):
 
