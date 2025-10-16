@@ -70,15 +70,15 @@ class ThicknessCalculatorAlgorithm(QgsProcessingAlgorithm):
 
     def displayName(self) -> str:
         """Return the algorithm display name."""
-        return "Loop3d: Thickness Calculator"
+        return "Thickness Calculator"
 
     def group(self) -> str:
         """Return the algorithm group name."""
-        return "Loop3d"
+        return "Thickness Calculators"
 
     def groupId(self) -> str:
         """Return the algorithm group ID."""
-        return "Loop3d"
+        return "Thickness_Calculators"
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
