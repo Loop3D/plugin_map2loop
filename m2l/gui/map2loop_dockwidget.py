@@ -269,7 +269,7 @@ class Map2loopDockWidget(QDockWidget, FORM_CLASS):
             
             features = []
             if hasattr(geodataframe, 'iterrows'):
-                for idx, row in geodataframe.iterrows():
+                for _idx, row in geodataframe.iterrows():
                     feature = QgsFeature()
                     
                     if hasattr(row, 'geometry') and row.geometry is not None:
@@ -283,7 +283,7 @@ class Map2loopDockWidget(QDockWidget, FORM_CLASS):
                     feature.setAttributes(attributes)
                     features.append(feature)
             else:
-                for i, item in enumerate(geodataframe):
+                for i, _item in enumerate(geodataframe):
                     feature = QgsFeature()
                     feature.setAttributes([i, "feature"])
                     features.append(feature)
