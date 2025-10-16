@@ -176,11 +176,19 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
             samples = sampler.sample(spatial_data_gdf)
         
         fields = QgsFields()
-        fields.append(QgsField("ID", QVariant.String))
-        fields.append(QgsField("X", QVariant.Double))
-        fields.append(QgsField("Y", QVariant.Double))
-        fields.append(QgsField("Z", QVariant.Double))
-        fields.append(QgsField("featureId", QVariant.String))
+        if samples is not None and not samples.empty:
+            for column_name in samples.columns:
+                dtype = samples[column_name].dtype
+                dtype_str = str(dtype)
+            
+                if dtype_str in ['float16', 'float32', 'float64']:
+                    field_type = QVariant.Double
+                elif dtype_str in ['int8', 'int16', 'int32', 'int64']:
+                    field_type = QVariant.Int
+                else:
+                    field_type = QVariant.String
+                
+                fields.append(QgsField(column_name, field_type))
 
         crs = None
         if spatial_data_gdf is not None and spatial_data_gdf.crs is not None:
@@ -207,13 +215,21 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
                     #spacing has no z values
                     feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(row['X'], row['Y'])))
                 
-                feature.setAttributes([
-                    str(row.get('ID', '')),
-                    float(row.get('X', 0)),
-                    float(row.get('Y', 0)),
-                    float(row.get('Z', 0)) if pd.notna(row.get('Z')) else 0.0,
-                    str(row.get('featureId', ''))
-                ])
+                attributes = []
+                for column_name in samples.columns:
+                    value = row.get(column_name)
+                    dtype = samples[column_name].dtype
+                    
+                    if pd.isna(value):
+                        attributes.append(None)
+                    elif dtype in ['float16', 'float32', 'float64']:
+                        attributes.append(float(value))
+                    elif dtype in ['int8', 'int16', 'int32', 'int64']:
+                        attributes.append(int(value))
+                    else:
+                        attributes.append(str(value))
+                
+                feature.setAttributes(attributes)
                 
                 sink.addFeature(feature)
 
