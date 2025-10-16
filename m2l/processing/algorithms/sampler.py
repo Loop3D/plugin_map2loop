@@ -10,7 +10,7 @@
 """
 # Python imports
 from typing import Any, Optional
-from qgis.PyQt.QtCore import QVariant
+from qgis.PyQt.QtCore import QMetaType, QVariant
 from osgeo import gdal
 import pandas as pd
 
@@ -59,15 +59,15 @@ class SamplerAlgorithm(QgsProcessingAlgorithm):
 
     def displayName(self) -> str:
         """Return the algorithm display name."""
-        return "Loop3d: Sampler"
+        return "Spacing-Decimator Samplers"
 
     def group(self) -> str:
         """Return the algorithm group name."""
-        return "Loop3d"
+        return "Samplers"
 
     def groupId(self) -> str:
         """Return the algorithm group ID."""
-        return "Loop3d"
+        return "Samplers"
 
     def initAlgorithm(self, config: Optional[dict[str, Any]] = None) -> None:
         """Initialize the algorithm parameters."""
