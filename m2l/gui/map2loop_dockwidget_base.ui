@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Map2loopDockWidgetBase</class>
+ <widget class="QDockWidget" name="Map2loopDockWidgetBase">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>300</width>
+    <height>400</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>map2loop</string>
+  </property>
+  <widget class="QWidget" name="dockWidgetContents">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="titleLabel">
+      <property name="font">
+       <font>
+        <pointsize>12</pointsize>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="text">
+       <string>map2loop Plugin</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="input_data_groupBox">
+      <property name="title">
+       <string>Input Data</string>
+      </property>
+      <layout class="QFormLayout" name="input_data_formLayout">
+       <item row="0" column="0">
+        <widget class="QLabel" name="geology_label">
+         <property name="text">
+          <string>Geology Layer:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QComboBox" name="geology_comboBox"/>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="structure_label">
+         <property name="text">
+          <string>Structure Layer:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QComboBox" name="structure_comboBox"/>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="dtm_label">
+         <property name="text">
+          <string>DTM Layer:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QComboBox" name="dtm_comboBox"/>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="fault_label">
+         <property name="text">
+          <string>Fault Layer:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QComboBox" name="fault_comboBox"/>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="strat_column_label">
+         <property name="text">
+          <string>Stratigraphic Column:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QComboBox" name="strat_column_comboBox"/>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="unit_name_field_label">
+         <property name="text">
+          <string>Unit Name Field:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QComboBox" name="unit_name_field_comboBox"/>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="extract_contact_button">
+      <property name="text">
+       <string>Extract Contact</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="extract_basal_contact_button">
+      <property name="text">
+       <string>Extract Basal Contact</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <spacer name="verticalSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>40</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
